@@ -202,3 +202,12 @@ The HTML report includes this reminder:
 - More enrichment providers with configurable enable/disable options
 - Improved logging and execution summaries for bulk investigations
 
+## Example Output
+- Usage via Powershell CLI
+![alt text](https://github.com/ArronJablonowski/SOCCOM/blob/main/img/example_cli.png?raw=true)
+
+- HTML report for IP, Domain, and URI investigations
+![alt text](https://github.com/ArronJablonowski/SOCCOM/blob/main/img/example_html_report.png?raw=true)
+
+- Example markdown IR template *Pro tip: Make your Obsidian Vault point to the 'Investigations' directory*
+![alt text](https://github.com/ArronJablonowski/SOCCOM/blob/main/img/obsidian_investigation_template.png?raw=true)
