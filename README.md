@@ -178,7 +178,6 @@ Run it with:
 
 ```text
 SOCCOM.ps1                       Main SOCCOM script
-SOC_Investigation_Template.md    Markdown source template reference
 Results/                         Generated HTML reports and CSV exports
 Investigations/                  Generated Markdown investigation notes
 Logs/                            Runtime queue and log files
