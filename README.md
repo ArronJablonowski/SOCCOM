@@ -202,8 +202,3 @@ The HTML report includes this reminder:
 - More enrichment providers with configurable enable/disable options
 - Improved logging and execution summaries for bulk investigations
 
-## Author
-
-Created by [Arron Jablonowski](https://github.com/ArronJablonowski).
-
-Project repository: [ArronJablonowski/SOCCOM](https://github.com/ArronJablonowski/SOCCOM)
