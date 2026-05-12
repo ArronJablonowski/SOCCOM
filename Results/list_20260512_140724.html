@@ -1,0 +1,1338 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SOCCOM Investigation Report - Indicator Intelligence Report</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #f5f7fb;
+      --surface: #ffffff;
+      --surface-soft: #f9fbfd;
+      --surface-strong: #10251f;
+      --text: #172033;
+      --muted: #647083;
+      --line: #d9e1ec;
+      --accent: #087a5b;
+      --accent-soft: #e9f8f2;
+      --accent-strong: #056348;
+      --danger: #b42318;
+      --danger-soft: #fff1f0;
+      --warning-soft: #fffbeb;
+      --warning-line: #f3d49a;
+      --shadow: 0 18px 45px rgba(23, 32, 51, 0.08);
+      --radius: 8px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; min-height: 100vh; background: linear-gradient(180deg, #edf3f8 0%, var(--page) 420px), var(--page); color: var(--text); font-size: 16px; line-height: 1.5; }
+    a { color: var(--accent-strong); text-decoration: none; }
+    a:hover { text-decoration: underline; text-underline-offset: 3px; }
+    .page { width: min(1320px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0 56px; }
+    .report-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; margin-bottom: 20px; padding: 30px; border: 1px solid rgba(5, 99, 72, 0.14); border-radius: var(--radius); background: var(--surface-strong); color: #ffffff; box-shadow: var(--shadow); }
+    .eyebrow { margin: 0 0 8px; color: #9ee6cf; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 10px; font-size: clamp(2rem, 5vw, 3.55rem); line-height: 1.08; letter-spacing: 0; }
+    .header-copy { max-width: 760px; margin: 0; color: #d6f7eb; font-size: 1rem; }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .metric { min-height: 96px; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: 0 10px 28px rgba(23, 32, 51, 0.05); }
+    .metric span { display: block; color: var(--muted); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+    .metric strong { display: block; margin-top: 8px; font-size: clamp(1.35rem, 3vw, 2rem); line-height: 1.1; }
+    .report-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 22px; align-items: start; }
+    .indicator-nav { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: rgba(255, 255, 255, 0.92); box-shadow: var(--shadow); backdrop-filter: blur(10px); }
+    .nav-title { margin: 0 0 12px; color: var(--muted); font-size: 0.75rem; font-weight: 850; letter-spacing: 0.08em; text-transform: uppercase; }
+    .nav-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .nav-list a { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid transparent; border-radius: var(--radius); color: var(--text); font-weight: 800; overflow-wrap: anywhere; }
+    .nav-list a:hover { border-color: rgba(8, 122, 91, 0.3); background: var(--accent-soft); color: var(--accent-strong); text-decoration: none; }
+    .nav-list small { color: var(--muted); font-weight: 650; }
+    .indicator-stack { display: grid; gap: 18px; }
+    .indicator-card { overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); scroll-margin-top: 18px; }
+    .indicator-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; padding: 22px 24px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%); }
+    .indicator-title { margin: 0; font-size: clamp(1.35rem, 3vw, 2.1rem); line-height: 1.15; overflow-wrap: anywhere; }
+    .timestamp { display: inline-flex; align-items: center; min-height: 34px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-soft); color: #344054; font-size: 0.86rem; font-weight: 800; white-space: nowrap; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .pill { display: inline-flex; align-items: center; min-height: 32px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-soft); color: #344054; font-size: 0.84rem; font-weight: 750; }
+    .pill.danger { border-color: #f5c2bd; background: var(--danger-soft); color: var(--danger); }
+    .indicator-body { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); gap: 18px; padding: 22px 24px 24px; }
+    .panel, details { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    .panel.full, details.full { grid-column: 1 / -1; }
+    .panel-title, summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 13px 16px; border-bottom: 1px solid var(--line); background: var(--surface-soft); font-size: 0.92rem; font-weight: 850; }
+    details:not([open]) summary { border-bottom: 0; }
+    summary { cursor: pointer; list-style: none; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; display: inline-grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--line); border-radius: 999px; color: var(--accent-strong); font-weight: 900; flex: 0 0 auto; }
+    details[open] summary::after { content: "-"; }
+    .panel-count { color: var(--muted); font-size: 0.78rem; font-weight: 800; white-space: nowrap; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; min-width: 520px; border-collapse: collapse; }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; word-break: break-word; }
+    th { color: #344054; font-size: 0.75rem; font-weight: 850; letter-spacing: 0.05em; text-transform: uppercase; }
+    .summary-table { min-width: 680px; table-layout: fixed; }
+    .summary-table th { width: 210px; min-width: 210px; white-space: nowrap; }
+    .summary-table td { overflow-wrap: anywhere; }
+    tr:last-child th, tr:last-child td { border-bottom: 0; }
+    .callout { margin: 0; padding: 14px 16px; color: var(--danger); font-weight: 800; background: var(--danger-soft); }
+    .callout.neutral { color: #344054; background: var(--surface-soft); }
+    pre { max-height: 360px; margin: 0; padding: 16px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #27364f; background: #fbfdff; font: 0.88rem/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    details.rdap-whois pre { max-height: none; }
+    .empty { margin: 0; padding: 16px; color: var(--muted); font-weight: 700; }
+    .screenshot-link { display: block; padding: 16px; }
+    .screenshot-link img { display: block; width: min(100%, 540px); height: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+    .link-grid { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 16px; list-style: none; }
+    .link-grid a { display: inline-flex; align-items: center; min-height: 34px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-soft); color: #1d2939; font-size: 0.86rem; font-weight: 800; }
+    .link-grid a:hover { border-color: rgba(8, 122, 91, 0.45); background: var(--accent-soft); color: var(--accent-strong); text-decoration: none; }
+    .note { margin: 24px 0 0; padding: 14px 16px; border: 1px solid var(--warning-line); border-radius: var(--radius); background: var(--warning-soft); color: #7a4d00; font-size: 0.94rem; }
+    .report-credit { margin: 16px 0 0; color: var(--muted); font-size: 0.88rem; font-weight: 700; text-align: center; }
+    .report-credit a { color: var(--accent-strong); font-weight: 850; }
+    @media (max-width: 980px) { .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .report-layout { grid-template-columns: 1fr; } .indicator-nav { position: static; max-height: none; } .nav-list { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); } .indicator-body { grid-template-columns: 1fr; } }
+    @media (max-width: 680px) { .page { width: min(100% - 20px, 1320px); padding: 10px 0 32px; } .report-header, .indicator-head { grid-template-columns: 1fr; } .report-header, .indicator-head, .indicator-body { padding: 20px; } .summary-grid { grid-template-columns: 1fr; } .timestamp { width: fit-content; white-space: normal; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="report-header">
+      <div>
+        <p class="eyebrow">SOCCOM</p>
+        <h1>Indicator Intelligence Report</h1>
+        <p class="header-copy">A SOC-focused evidence report for quickly reviewing suspicious indicators and the intelligence gathered around them.</p>
+      </div>
+      <div class="timestamp">2026-05-12 20:00:12 UTC to 2026-05-12 20:05:59 UTC</div>
+    </header>
+
+    <section class="summary-grid" aria-label="Report summary">
+      <div class="metric"><span>Total Indicators</span><strong>13</strong></div>
+      <div class="metric"><span>Countries</span><strong>5</strong></div>
+      <div class="metric"><span>Unique ASNs</span><strong>9</strong></div>
+      <div class="metric"><span>AbuseIP Matches</span><strong>4</strong></div>
+    </section>
+
+    <div class="report-layout">
+      <aside class="indicator-nav" aria-label="Indicator index">
+        <p class="nav-title">Indicator Index</p>
+        <ol class="nav-list">
+                    <li>
+            <a href="#indicator-185-200-118-46-1">
+              <span>185.200.118.46</span>
+              <small>1 - 2026-05-12 20:03:13 UTC</small>
+            </a>
+          </li>
+          <li>
+            <a href="#indicator-20-163-14-5-2">
+              <span>20.163.14.5</span>
+              <small>2 - 2026-05-12 20:03:33 UTC</small>
+            </a>
+          </li>
+          <li>
+            <a href="#indicator-91-230-168-116-3">
+              <span>91.230.168.116</span>
+              <small>3 - 2026-05-12 20:03:53 UTC</small>
+            </a>
+          </li>
+          <li>
+            <a href="#indicator-91-231-89-164-4">
+              <span>91.231.89.164</span>
+              <small>4 - 2026-05-12 20:04:13 UTC</small>
+            </a>
+          </li>
+          <li>
+            <a href="#indicator-2001-df7-3c00-800a-446-34dc-5">
+              <span>2001:df7:3c00:800a::446:34dc</span>
+              <small>5 - 2026-05-12 20:04:33 UTC</small>
+            </a>
+          </li>
+          <li>
+            <a href="#indicator-pubnub-com-6">
+              <span>pubnub.com</span>
+              <small>6 - 2026-05-12 20:00:12 UTC</small>
+            </a>
+          </li>
+          <li>
+            <a href="#indicator-app-measurement-com-7">
+              <span>app-measurement.com</span>
+              <small>7 - 2026-05-12 20:00:30 UTC</small>
+            </a>
+          </li>
+          <li>
+            <a href="#indicator-b-scorecardresearch-com-8">
+              <span>b.scorecardresearch.com</span>
+              <small>8 - 2026-05-12 20:00:51 UTC</small>
+            </a>
+          </li>
+          <li>
+            <a href="#indicator-assets-tapad-com-9">
+              <span>assets.tapad.com</span>
+              <small>9 - 2026-05-12 20:05:59 UTC</small>
+            </a>
+          </li>
+          <li>
+            <a href="#indicator-bidder-criteo-com-10">
+              <span>bidder.criteo.com</span>
+              <small>10 - 2026-05-12 20:01:33 UTC</small>
+            </a>
+          </li>
+          <li>
+            <a href="#indicator-api-2-0-spot-im-11">
+              <span>api-2-0.spot.im</span>
+              <small>11 - 2026-05-12 20:01:55 UTC</small>
+            </a>
+          </li>
+          <li>
+            <a href="#indicator-https-thehackernews-com-2026-05-new-trickmo-variant-uses-ton-c2-and-html-12">
+              <span>https://thehackernews.com/2026/05/new-trickmo-variant-uses-ton-c2-and.html</span>
+              <small>12 - 2026-05-12 20:02:17 UTC</small>
+            </a>
+          </li>
+          <li>
+            <a href="#indicator-https-thehackernews-com-2026-05-your-purple-team-isnt-purple-its-just-html-13">
+              <span>https://thehackernews.com/2026/05/your-purple-team-isnt-purple-its-just.html</span>
+              <small>13 - 2026-05-12 20:02:43 UTC</small>
+            </a>
+          </li>
+        </ol>
+      </aside>
+
+      <section class="indicator-stack" aria-label="Indicator details">
+                <article class="indicator-card" id="indicator-185-200-118-46-1">
+          <header class="indicator-head">
+            <div>
+              <p class="eyebrow">Indicator 1</p>
+              <h2 class="indicator-title"><a href="https://dnslytics.com/ip/185.200.118.46" target="_blank" rel="noopener noreferrer">185.200.118.46</a></h2>
+              <div class="pill-row">
+                <span class="pill">IP address</span>
+                <span class="pill danger">AbuseIP match</span>
+                <span class="pill">GB</span>
+                <span class="pill">ASN 9009</span>
+                <span class="pill">0 hosts</span>
+                <span class="pill">2 URLs</span>
+              </div>
+            </div>
+            <div class="timestamp">2026-05-12 20:03:13 UTC</div>
+          </header>
+
+          <div class="indicator-body">
+                        <details open>
+              <summary><span>AbuseIPdb.com</span></summary>
+              <p class="callout">Match found</p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Status</th><td>FOUND in AbuseIPDB</td></tr>
+<tr><th>Abuse Confidence</th><td>100%</td></tr>
+<tr><th>Reports</th><td>791</td></tr>
+<tr><th>Country</th><td>GB</td></tr>
+<tr><th>ISP</th><td>M247 LTD London Infrastructure</td></tr>
+<tr><th>Domain</th><td>m247.com</td></tr>
+<tr><th>Usage</th><td>Data Center/Web Hosting/Transit</td></tr>
+<tr><th>Tor</th><td>False</td></tr>
+<tr><th>Whitelisted</th><td>False</td></tr>
+<tr><th>Last Reported</th><td>05/12/2026 12:43:12</td></tr>
+                </table>
+              </div>
+            </details>
+            <details open>
+              <summary><span>Investigation Summary</span></summary>
+              <div class="table-wrap">
+                <table class="summary-table">
+                  <tr><th>Data Set</th><td>IP address in dataset</td></tr>
+<tr><th>Country</th><td>GB</td></tr>
+<tr><th>ASN</th><td>9009</td></tr>
+<tr><th>Autonomous System</th><td>M247 Europe SRL</td></tr>
+                </table>
+              </div>
+            </details>
+                        <details open>
+              <summary><span>Resolved Host Names</span><span class="panel-count">0 items</span></summary>
+              <p class="empty">No resolved hosts captured.</p>
+            </details>
+            <details open>
+              <summary><span>Detected URLs</span><span class="panel-count">2 items</span></summary>
+              <pre>hxxps://185.200.118.46/
+hxxp://185.200.118.46/</pre>
+            </details>
+            <details class="rdap-whois" open>
+              <summary><span>RDAP / WHOIS</span><span class="panel-count">23 items</span></summary>
+              <pre>RDAP query: https://rdap.db.ripe.net/ip/185.200.118.46
+Object class: ip network
+Handle: 185.200.118.0 - 185.200.118.255
+Name: M247-LTD-London
+Type: LIR-PARTITIONED PA
+Range: 185.200.118.0 - 185.200.118.255
+IP version: v4
+Country: GB
+Parent handle: 185.200.116.0 - 185.200.119.255
+Port 43 WHOIS: whois.ripe.net
+Status: active
+
+Events:
+ - registration: 04/24/2017 09:06:54
+ - last changed: 04/24/2017 09:06:54
+
+Entities:
+ - administrative, technical: GLOBALAXS NOC | abuse@m247.ro
+ - registrant: GLOBALAXS-MNT
+ - abuse: M247 Europe | abuse@m247.ro
+
+Notices:
+ - Filtered
+ - Whois Inaccuracy Reporting
+ - Source
+ - Terms and Conditions</pre>
+            </details>
+            
+            <details class="full">
+              <summary><span>Lookup Resources</span></summary>
+              <ul class="link-grid">
+                <li><a href="https://whois.domaintools.com/185.200.118.46" target="_blank" rel="noopener noreferrer">DomainTools</a></li>
+<li><a href="https://who.is/whois-ip/ip-address/185.200.118.46" target="_blank" rel="noopener noreferrer">Who.Is</a></li>
+<li><a href="https://exchange.xforce.ibmcloud.com/ip/185.200.118.46" target="_blank" rel="noopener noreferrer">IBMcloud.com</a></li>
+<li><a href="https://www.virustotal.com/en/ip-address/185.200.118.46/information/" target="_blank" rel="noopener noreferrer">VirusTotal</a></li>
+<li><a href="https://www.abuseipdb.com/check/185.200.118.46" target="_blank" rel="noopener noreferrer">AbuseIPdb.com</a></li>
+<li><a href="https://www.threatminer.org/host.php?q=185.200.118.46" target="_blank" rel="noopener noreferrer">ThreatMiner.org</a></li>
+<li><a href="https://otx.alienvault.com/indicator/ip/185.200.118.46" target="_blank" rel="noopener noreferrer">AlienVault.com</a></li>
+<li><a href="https://www.robtex.com/dns-lookup/185.200.118.46" target="_blank" rel="noopener noreferrer">Robtex.com</a></li>
+<li><a href="https://www.shodan.io/search?query=185.200.118.46" target="_blank" rel="noopener noreferrer">Shodan.io</a></li>
+<li><a href="https://sitecheck.sucuri.net/results/185.200.118.46" target="_blank" rel="noopener noreferrer">Securi.net</a></li>
+<li><a href="https://www.dns.ninja/?dns=185.200.118.46" target="_blank" rel="noopener noreferrer">DNS.ninja</a></li>
+              </ul>
+            </details>
+          </div>
+        </article>
+        <article class="indicator-card" id="indicator-20-163-14-5-2">
+          <header class="indicator-head">
+            <div>
+              <p class="eyebrow">Indicator 2</p>
+              <h2 class="indicator-title"><a href="https://dnslytics.com/ip/20.163.14.5" target="_blank" rel="noopener noreferrer">20.163.14.5</a></h2>
+              <div class="pill-row">
+                <span class="pill">IP address</span>
+                <span class="pill danger">AbuseIP match</span>
+                <span class="pill">US</span>
+                <span class="pill">ASN 8075</span>
+                <span class="pill">6 hosts</span>
+                <span class="pill">2 URLs</span>
+              </div>
+            </div>
+            <div class="timestamp">2026-05-12 20:03:33 UTC</div>
+          </header>
+
+          <div class="indicator-body">
+                        <details open>
+              <summary><span>AbuseIPdb.com</span></summary>
+              <p class="callout">Match found</p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Status</th><td>FOUND in AbuseIPDB</td></tr>
+<tr><th>Abuse Confidence</th><td>100%</td></tr>
+<tr><th>Reports</th><td>1264</td></tr>
+<tr><th>Country</th><td>US</td></tr>
+<tr><th>ISP</th><td>Microsoft Corporation</td></tr>
+<tr><th>Domain</th><td>microsoft.com</td></tr>
+<tr><th>Usage</th><td>Data Center/Web Hosting/Transit</td></tr>
+<tr><th>Tor</th><td>False</td></tr>
+<tr><th>Whitelisted</th><td>False</td></tr>
+<tr><th>Last Reported</th><td>05/12/2026 07:06:12</td></tr>
+                </table>
+              </div>
+            </details>
+            <details open>
+              <summary><span>Investigation Summary</span></summary>
+              <div class="table-wrap">
+                <table class="summary-table">
+                  <tr><th>Data Set</th><td>IP address in dataset</td></tr>
+<tr><th>Country</th><td>US</td></tr>
+<tr><th>ASN</th><td>8075</td></tr>
+<tr><th>Autonomous System</th><td>Microsoft Corporation</td></tr>
+                </table>
+              </div>
+            </details>
+                        <details open>
+              <summary><span>Resolved Host Names</span><span class="panel-count">6 items</span></summary>
+              <pre>last_resolved=2022-10-11 22:48:54 hostname=20004966.ugalileo.space
+last_resolved=2022-10-11 22:53:05 hostname=20005155.ugalileo.space
+last_resolved=2022-10-11 22:58:35 hostname=20006479.ugalileo.space
+last_resolved=2022-10-11 23:08:06 hostname=20006864.ugalileo.space
+last_resolved=2025-03-03 08:48:41 hostname=azpdwgrog8v9.stretchoid.com
+last_resolved=2022-10-01 08:30:19 hostname=g02.a1.ugalileo.space</pre>
+            </details>
+            <details open>
+              <summary><span>Detected URLs</span><span class="panel-count">2 items</span></summary>
+              <pre>hxxp://20.163.14.5/
+hxxps://20.163.14.5/</pre>
+            </details>
+            <details class="rdap-whois" open>
+              <summary><span>RDAP / WHOIS</span><span class="panel-count">19 items</span></summary>
+              <pre>RDAP query: https://rdap.arin.net/registry/ip/20.163.14.5
+Object class: ip network
+Handle: NET-20-160-0-0-1
+Name: MSFT
+Type: DIRECT ALLOCATION
+Range: 20.160.0.0 - 20.175.255.255
+IP version: v4
+Parent handle: NET-20-0-0-0-0
+Port 43 WHOIS: whois.arin.net
+Status: active
+
+Events:
+ - last changed: 02/22/2017 08:27:12
+ - registration: 02/22/2017 08:27:12
+
+Entities:
+ - registrant: Microsoft Corporation
+
+Notices:
+ - Terms of Service
+ - Whois Inaccuracy Reporting
+ - Copyright Notice</pre>
+            </details>
+            
+            <details class="full">
+              <summary><span>Lookup Resources</span></summary>
+              <ul class="link-grid">
+                <li><a href="https://whois.domaintools.com/20.163.14.5" target="_blank" rel="noopener noreferrer">DomainTools</a></li>
+<li><a href="https://who.is/whois-ip/ip-address/20.163.14.5" target="_blank" rel="noopener noreferrer">Who.Is</a></li>
+<li><a href="https://exchange.xforce.ibmcloud.com/ip/20.163.14.5" target="_blank" rel="noopener noreferrer">IBMcloud.com</a></li>
+<li><a href="https://www.virustotal.com/en/ip-address/20.163.14.5/information/" target="_blank" rel="noopener noreferrer">VirusTotal</a></li>
+<li><a href="https://www.abuseipdb.com/check/20.163.14.5" target="_blank" rel="noopener noreferrer">AbuseIPdb.com</a></li>
+<li><a href="https://www.threatminer.org/host.php?q=20.163.14.5" target="_blank" rel="noopener noreferrer">ThreatMiner.org</a></li>
+<li><a href="https://otx.alienvault.com/indicator/ip/20.163.14.5" target="_blank" rel="noopener noreferrer">AlienVault.com</a></li>
+<li><a href="https://www.robtex.com/dns-lookup/20.163.14.5" target="_blank" rel="noopener noreferrer">Robtex.com</a></li>
+<li><a href="https://www.shodan.io/search?query=20.163.14.5" target="_blank" rel="noopener noreferrer">Shodan.io</a></li>
+<li><a href="https://sitecheck.sucuri.net/results/20.163.14.5" target="_blank" rel="noopener noreferrer">Securi.net</a></li>
+<li><a href="https://www.dns.ninja/?dns=20.163.14.5" target="_blank" rel="noopener noreferrer">DNS.ninja</a></li>
+              </ul>
+            </details>
+          </div>
+        </article>
+        <article class="indicator-card" id="indicator-91-230-168-116-3">
+          <header class="indicator-head">
+            <div>
+              <p class="eyebrow">Indicator 3</p>
+              <h2 class="indicator-title"><a href="https://dnslytics.com/ip/91.230.168.116" target="_blank" rel="noopener noreferrer">91.230.168.116</a></h2>
+              <div class="pill-row">
+                <span class="pill">IP address</span>
+                <span class="pill danger">AbuseIP match</span>
+                <span class="pill">US</span>
+                <span class="pill">ASN 213412</span>
+                <span class="pill">0 hosts</span>
+                <span class="pill">2 URLs</span>
+              </div>
+            </div>
+            <div class="timestamp">2026-05-12 20:03:53 UTC</div>
+          </header>
+
+          <div class="indicator-body">
+                        <details open>
+              <summary><span>AbuseIPdb.com</span></summary>
+              <p class="callout">Match found</p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Status</th><td>FOUND in AbuseIPDB</td></tr>
+<tr><th>Abuse Confidence</th><td>100%</td></tr>
+<tr><th>Reports</th><td>650</td></tr>
+<tr><th>Country</th><td>US</td></tr>
+<tr><th>ISP</th><td>FR ONYPHE</td></tr>
+<tr><th>Domain</th><td>onyphe.io</td></tr>
+<tr><th>Usage</th><td>Data Center/Web Hosting/Transit</td></tr>
+<tr><th>Tor</th><td>False</td></tr>
+<tr><th>Whitelisted</th><td>False</td></tr>
+<tr><th>Last Reported</th><td>05/12/2026 12:05:43</td></tr>
+                </table>
+              </div>
+            </details>
+            <details open>
+              <summary><span>Investigation Summary</span></summary>
+              <div class="table-wrap">
+                <table class="summary-table">
+                  <tr><th>Data Set</th><td>IP address in dataset</td></tr>
+<tr><th>Country</th><td>US</td></tr>
+<tr><th>ASN</th><td>213412</td></tr>
+<tr><th>Autonomous System</th><td>ONYPHE SAS</td></tr>
+                </table>
+              </div>
+            </details>
+                        <details open>
+              <summary><span>Resolved Host Names</span><span class="panel-count">0 items</span></summary>
+              <p class="empty">No resolved hosts captured.</p>
+            </details>
+            <details open>
+              <summary><span>Detected URLs</span><span class="panel-count">2 items</span></summary>
+              <pre>hxxps://91.230.168.116/
+hxxp://91.230.168.116/</pre>
+            </details>
+            <details class="rdap-whois" open>
+              <summary><span>RDAP / WHOIS</span><span class="panel-count">25 items</span></summary>
+              <pre>RDAP query: https://rdap.db.ripe.net/ip/91.230.168.116
+Object class: ip network
+Handle: 91.230.168.0 - 91.230.168.255
+Name: FR-ONYPHE-20191111
+Type: ALLOCATED PA
+Range: 91.230.168.0 - 91.230.168.255
+IP version: v4
+Country: US
+Parent handle: 0.0.0.0 - 255.255.255.255
+Port 43 WHOIS: whois.ripe.net
+Status: active
+
+Events:
+ - registration: 05/09/2025 12:36:09
+ - last changed: 05/09/2025 13:04:43
+
+Entities:
+ - administrative, technical: Admin | +33 (0) 972 66 1884
+ - registrant: lir-fr-onyphe-1-MNT
+ - registrant: ONYPHE SAS | +33 (0) 972 66 1884
+ - registrant: RIPE-NCC-HM-MNT
+ - abuse: Abuse-C Role | abuse@onyphe.io
+
+Notices:
+ - Filtered
+ - Whois Inaccuracy Reporting
+ - Source
+ - Terms and Conditions</pre>
+            </details>
+            
+            <details class="full">
+              <summary><span>Lookup Resources</span></summary>
+              <ul class="link-grid">
+                <li><a href="https://whois.domaintools.com/91.230.168.116" target="_blank" rel="noopener noreferrer">DomainTools</a></li>
+<li><a href="https://who.is/whois-ip/ip-address/91.230.168.116" target="_blank" rel="noopener noreferrer">Who.Is</a></li>
+<li><a href="https://exchange.xforce.ibmcloud.com/ip/91.230.168.116" target="_blank" rel="noopener noreferrer">IBMcloud.com</a></li>
+<li><a href="https://www.virustotal.com/en/ip-address/91.230.168.116/information/" target="_blank" rel="noopener noreferrer">VirusTotal</a></li>
+<li><a href="https://www.abuseipdb.com/check/91.230.168.116" target="_blank" rel="noopener noreferrer">AbuseIPdb.com</a></li>
+<li><a href="https://www.threatminer.org/host.php?q=91.230.168.116" target="_blank" rel="noopener noreferrer">ThreatMiner.org</a></li>
+<li><a href="https://otx.alienvault.com/indicator/ip/91.230.168.116" target="_blank" rel="noopener noreferrer">AlienVault.com</a></li>
+<li><a href="https://www.robtex.com/dns-lookup/91.230.168.116" target="_blank" rel="noopener noreferrer">Robtex.com</a></li>
+<li><a href="https://www.shodan.io/search?query=91.230.168.116" target="_blank" rel="noopener noreferrer">Shodan.io</a></li>
+<li><a href="https://sitecheck.sucuri.net/results/91.230.168.116" target="_blank" rel="noopener noreferrer">Securi.net</a></li>
+<li><a href="https://www.dns.ninja/?dns=91.230.168.116" target="_blank" rel="noopener noreferrer">DNS.ninja</a></li>
+              </ul>
+            </details>
+          </div>
+        </article>
+        <article class="indicator-card" id="indicator-91-231-89-164-4">
+          <header class="indicator-head">
+            <div>
+              <p class="eyebrow">Indicator 4</p>
+              <h2 class="indicator-title"><a href="https://dnslytics.com/ip/91.231.89.164" target="_blank" rel="noopener noreferrer">91.231.89.164</a></h2>
+              <div class="pill-row">
+                <span class="pill">IP address</span>
+                <span class="pill danger">AbuseIP match</span>
+                <span class="pill">FR</span>
+                <span class="pill">ASN 213412</span>
+                <span class="pill">1 hosts</span>
+                <span class="pill">2 URLs</span>
+              </div>
+            </div>
+            <div class="timestamp">2026-05-12 20:04:13 UTC</div>
+          </header>
+
+          <div class="indicator-body">
+                        <details open>
+              <summary><span>AbuseIPdb.com</span></summary>
+              <p class="callout">Match found</p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Status</th><td>FOUND in AbuseIPDB</td></tr>
+<tr><th>Abuse Confidence</th><td>100%</td></tr>
+<tr><th>Reports</th><td>560</td></tr>
+<tr><th>Country</th><td>FR</td></tr>
+<tr><th>ISP</th><td>FR ONYPHE</td></tr>
+<tr><th>Domain</th><td>onyphe.io</td></tr>
+<tr><th>Usage</th><td>Data Center/Web Hosting/Transit</td></tr>
+<tr><th>Tor</th><td>False</td></tr>
+<tr><th>Whitelisted</th><td>False</td></tr>
+<tr><th>Last Reported</th><td>05/12/2026 12:05:43</td></tr>
+                </table>
+              </div>
+            </details>
+            <details open>
+              <summary><span>Investigation Summary</span></summary>
+              <div class="table-wrap">
+                <table class="summary-table">
+                  <tr><th>Data Set</th><td>IP address in dataset</td></tr>
+<tr><th>Country</th><td>FR</td></tr>
+<tr><th>ASN</th><td>213412</td></tr>
+<tr><th>Autonomous System</th><td>ONYPHE SAS</td></tr>
+                </table>
+              </div>
+            </details>
+                        <details open>
+              <summary><span>Resolved Host Names</span><span class="panel-count">1 item</span></summary>
+              <pre>last_resolved=2025-12-02 02:39:49 hostname=ethel.probe.onyphe.net</pre>
+            </details>
+            <details open>
+              <summary><span>Detected URLs</span><span class="panel-count">2 items</span></summary>
+              <pre>hxxps://91.231.89.164/
+hxxp://91.231.89.164/</pre>
+            </details>
+            <details class="rdap-whois" open>
+              <summary><span>RDAP / WHOIS</span><span class="panel-count">25 items</span></summary>
+              <pre>RDAP query: https://rdap.db.ripe.net/ip/91.231.89.164
+Object class: ip network
+Handle: 91.231.89.0 - 91.231.89.255
+Name: FR-ONYPHE-20191111
+Type: ALLOCATED PA
+Range: 91.231.89.0 - 91.231.89.255
+IP version: v4
+Country: FR
+Parent handle: 0.0.0.0 - 255.255.255.255
+Port 43 WHOIS: whois.ripe.net
+Status: active
+
+Events:
+ - registration: 05/09/2025 12:36:09
+ - last changed: 05/09/2025 13:08:59
+
+Entities:
+ - administrative, technical: Admin | +33 (0) 972 66 1884
+ - registrant: lir-fr-onyphe-1-MNT
+ - registrant: ONYPHE SAS | +33 (0) 972 66 1884
+ - registrant: RIPE-NCC-HM-MNT
+ - abuse: Abuse-C Role | abuse@onyphe.io
+
+Notices:
+ - Filtered
+ - Whois Inaccuracy Reporting
+ - Source
+ - Terms and Conditions</pre>
+            </details>
+            
+            <details class="full">
+              <summary><span>Lookup Resources</span></summary>
+              <ul class="link-grid">
+                <li><a href="https://whois.domaintools.com/91.231.89.164" target="_blank" rel="noopener noreferrer">DomainTools</a></li>
+<li><a href="https://who.is/whois-ip/ip-address/91.231.89.164" target="_blank" rel="noopener noreferrer">Who.Is</a></li>
+<li><a href="https://exchange.xforce.ibmcloud.com/ip/91.231.89.164" target="_blank" rel="noopener noreferrer">IBMcloud.com</a></li>
+<li><a href="https://www.virustotal.com/en/ip-address/91.231.89.164/information/" target="_blank" rel="noopener noreferrer">VirusTotal</a></li>
+<li><a href="https://www.abuseipdb.com/check/91.231.89.164" target="_blank" rel="noopener noreferrer">AbuseIPdb.com</a></li>
+<li><a href="https://www.threatminer.org/host.php?q=91.231.89.164" target="_blank" rel="noopener noreferrer">ThreatMiner.org</a></li>
+<li><a href="https://otx.alienvault.com/indicator/ip/91.231.89.164" target="_blank" rel="noopener noreferrer">AlienVault.com</a></li>
+<li><a href="https://www.robtex.com/dns-lookup/91.231.89.164" target="_blank" rel="noopener noreferrer">Robtex.com</a></li>
+<li><a href="https://www.shodan.io/search?query=91.231.89.164" target="_blank" rel="noopener noreferrer">Shodan.io</a></li>
+<li><a href="https://sitecheck.sucuri.net/results/91.231.89.164" target="_blank" rel="noopener noreferrer">Securi.net</a></li>
+<li><a href="https://www.dns.ninja/?dns=91.231.89.164" target="_blank" rel="noopener noreferrer">DNS.ninja</a></li>
+              </ul>
+            </details>
+          </div>
+        </article>
+        <article class="indicator-card" id="indicator-2001-df7-3c00-800a-446-34dc-5">
+          <header class="indicator-head">
+            <div>
+              <p class="eyebrow">Indicator 5</p>
+              <h2 class="indicator-title"><a href="https://dnslytics.com/ip/2001%3Adf7%3A3c00%3A800a%3A%3A446%3A34dc" target="_blank" rel="noopener noreferrer">2001:df7:3c00:800a::446:34dc</a></h2>
+              <div class="pill-row">
+                <span class="pill">IP address</span>
+                
+                <span class="pill">ID</span>
+                <span class="pill">ASN 38767</span>
+                <span class="pill">0 hosts</span>
+                <span class="pill">0 URLs</span>
+              </div>
+            </div>
+            <div class="timestamp">2026-05-12 20:04:33 UTC</div>
+          </header>
+
+          <div class="indicator-body">
+                        <details open>
+              <summary><span>AbuseIPdb.com</span></summary>
+              <p class="callout neutral">No active match</p>
+              <div class="table-wrap">
+                <table>
+                  <tr><th>Status</th><td>not found in AbuseIPDB reports from the last 90 days</td></tr>
+<tr><th>Abuse Confidence</th><td>0%</td></tr>
+<tr><th>Reports</th><td>0</td></tr>
+<tr><th>Country</th><td>ID</td></tr>
+<tr><th>ISP</th><td>PT Awan Media Semesta</td></tr>
+<tr><th>Domain</th><td>amscloud.id</td></tr>
+<tr><th>Usage</th><td>Data Center/Web Hosting/Transit</td></tr>
+<tr><th>Tor</th><td>False</td></tr>
+<tr><th>Whitelisted</th><td>False</td></tr>
+<tr><th>Last Reported</th><td>12/16/2024 16:00:38</td></tr>
+                </table>
+              </div>
+            </details>
+            <details open>
+              <summary><span>Investigation Summary</span></summary>
+              <div class="table-wrap">
+                <table class="summary-table">
+                  <tr><th>Data Set</th><td>IP address in dataset</td></tr>
+<tr><th>Country</th><td>ID</td></tr>
+<tr><th>ASN</th><td>38767</td></tr>
+<tr><th>Autonomous System</th><td>PT Awan Media Semesta</td></tr>
+                </table>
+              </div>
+            </details>
+                        <details open>
+              <summary><span>Resolved Host Names</span><span class="panel-count">0 items</span></summary>
+              <p class="empty">No resolved hosts captured.</p>
+            </details>
+            <details open>
+              <summary><span>Detected URLs</span><span class="panel-count">0 items</span></summary>
+              <p class="empty">No detected URLs captured.</p>
+            </details>
+            <details class="rdap-whois" open>
+              <summary><span>RDAP / WHOIS</span><span class="panel-count">20 items</span></summary>
+              <pre>RDAP query: https://rdap.apnic.net/ip/2001:df7:3c00:800a::446:34dc
+Object class: ip network
+Handle: 2001:df7:3c00::/48
+Name: IDNIC-AMSCLOUD-ID
+Type: ASSIGNED PORTABLE
+Range: 2001:df7:3c00:: - 2001:df7:3c00:ffff:ffff:ffff:ffff:ffff
+IP version: v6
+Country: ID
+Port 43 WHOIS: whois.apnic.net
+Status: active
+
+Events:
+ - registration: 08/20/2019 06:30:22
+ - last changed: 11/10/2015 07:44:43
+
+Entities:
+ - technical, administrative: Herlin Widiantoro | widi@amscloud.id | +62-21-29202160
+ - abuse: IRT-AMSCLOUD-ID | hostmaster@amscloud.co.id
+
+Notices:
+ - Source
+ - Terms and Conditions
+ - Whois Inaccuracy Reporting</pre>
+            </details>
+            
+            <details class="full">
+              <summary><span>Lookup Resources</span></summary>
+              <ul class="link-grid">
+                <li><a href="https://whois.domaintools.com/2001%3Adf7%3A3c00%3A800a%3A%3A446%3A34dc" target="_blank" rel="noopener noreferrer">DomainTools</a></li>
+<li><a href="https://who.is/whois-ip/ip-address/2001%3Adf7%3A3c00%3A800a%3A%3A446%3A34dc" target="_blank" rel="noopener noreferrer">Who.Is</a></li>
+<li><a href="https://exchange.xforce.ibmcloud.com/ip/2001%3Adf7%3A3c00%3A800a%3A%3A446%3A34dc" target="_blank" rel="noopener noreferrer">IBMcloud.com</a></li>
+<li><a href="https://www.virustotal.com/en/ip-address/2001%3Adf7%3A3c00%3A800a%3A%3A446%3A34dc/information/" target="_blank" rel="noopener noreferrer">VirusTotal</a></li>
+<li><a href="https://www.abuseipdb.com/check/2001%3Adf7%3A3c00%3A800a%3A%3A446%3A34dc" target="_blank" rel="noopener noreferrer">AbuseIPdb.com</a></li>
+<li><a href="https://www.threatminer.org/host.php?q=2001%3Adf7%3A3c00%3A800a%3A%3A446%3A34dc" target="_blank" rel="noopener noreferrer">ThreatMiner.org</a></li>
+<li><a href="https://otx.alienvault.com/indicator/ip/2001%3Adf7%3A3c00%3A800a%3A%3A446%3A34dc" target="_blank" rel="noopener noreferrer">AlienVault.com</a></li>
+<li><a href="https://www.robtex.com/dns-lookup/2001%3Adf7%3A3c00%3A800a%3A%3A446%3A34dc" target="_blank" rel="noopener noreferrer">Robtex.com</a></li>
+<li><a href="https://www.shodan.io/search?query=2001%3Adf7%3A3c00%3A800a%3A%3A446%3A34dc" target="_blank" rel="noopener noreferrer">Shodan.io</a></li>
+<li><a href="https://sitecheck.sucuri.net/results/2001%3Adf7%3A3c00%3A800a%3A%3A446%3A34dc" target="_blank" rel="noopener noreferrer">Securi.net</a></li>
+<li><a href="https://www.dns.ninja/?dns=2001%3Adf7%3A3c00%3A800a%3A%3A446%3A34dc" target="_blank" rel="noopener noreferrer">DNS.ninja</a></li>
+              </ul>
+            </details>
+          </div>
+        </article>
+        <article class="indicator-card" id="indicator-pubnub-com-6">
+          <header class="indicator-head">
+            <div>
+              <p class="eyebrow">Indicator 6</p>
+              <h2 class="indicator-title"><a href="https://dnslytics.com/domain/pubnub.com" target="_blank" rel="noopener noreferrer">pubnub.com</a></h2>
+              <div class="pill-row">
+                <span class="pill">Domain or URL</span>
+                
+                <span class="pill">US</span>
+                <span class="pill">ASN AS54113</span>
+                <span class="pill">0 hosts</span>
+                <span class="pill">0 URLs</span>
+              </div>
+            </div>
+            <div class="timestamp">2026-05-12 20:00:12 UTC</div>
+          </header>
+
+          <div class="indicator-body">
+            
+            <details open>
+              <summary><span>Investigation Summary</span></summary>
+              <div class="table-wrap">
+                <table class="summary-table">
+                  <tr><th>Submitted URL</th><td>http://pubnub.com/</td></tr>
+<tr><th>Effective URL</th><td>https://www.pubnub.com/</td></tr>
+<tr><th>Landing Domain</th><td>www.pubnub.com</td></tr>
+<tr><th>IP Address</th><td>151.101.1.167</td></tr>
+<tr><th>Server</th><td>Netlify</td></tr>
+<tr><th>Country</th><td>US</td></tr>
+<tr><th>ASN Name</th><td>FASTLY - Fastly, Inc., US</td></tr>
+<tr><th>ASN Number</th><td>AS54113</td></tr>
+<tr><th>Malware</th><td>0</td></tr>
+<tr><th>Ads Blocked</th><td>0</td></tr>
+<tr><th>Outgoing Links</th><td>status.pubnub.com, admin.pubnub.com, support.pubnub.com, www.facebook.com, twitter.com, www.linkedin.com, www.youtube.com, vimeo.com, www.threads.net</td></tr>
+<tr><th>VirusTotal Detections</th><td>0 / 93</td></tr>
+<tr><th>APIVoid Detections</th><td>0</td></tr>
+<tr><th>APIVoid Blacklists</th><td>n/a</td></tr>
+<tr><th>Domain Registration</th><td>Unknown</td></tr>
+                </table>
+              </div>
+            </details>
+                        <details class="rdap-whois" open>
+              <summary><span>RDAP / WHOIS</span><span class="panel-count">16 items</span></summary>
+              <pre>RDAP query: https://rdap.verisign.com/com/v1/domain/pubnub.com
+Object class: domain
+Domain: PUBNUB.COM
+Handle: 1594780132_DOMAIN_COM-VRSN
+Status: client delete prohibited, client renew prohibited, client transfer prohibited, client update prohibited
+
+Events:
+ - registration: 04/28/2010 20:22:09
+ - expiration: 04/28/2028 20:22:09
+ - last changed: 03/31/2026 01:19:23
+ - last update of RDAP database: 05/12/2026 20:04:45
+
+Entities:
+ - registrar: GoDaddy.com, LLC
+
+Notices:
+ - Terms of Service
+ - Status Codes
+ - RDDS Inaccuracy Complaint Form</pre>
+            </details>
+                        <details class="full" open>
+              <summary><span>URLScan Screenshot</span></summary>
+              <a class="screenshot-link" href="https://urlscan.io/screenshots/019e1dc6-67d3-768b-b7ae-f68b992fd6cc.png" target="_blank" rel="noopener noreferrer"><img src="https://urlscan.io/screenshots/019e1dc6-67d3-768b-b7ae-f68b992fd6cc.png" alt="URLScan screenshot for pubnub.com"></a>
+            </details>
+            <details class="full">
+              <summary><span>Lookup Resources</span></summary>
+              <ul class="link-grid">
+                <li><a href="https://whois.domaintools.com/pubnub.com" target="_blank" rel="noopener noreferrer">DomainTools</a></li>
+<li><a href="https://who.is/rdap/pubnub.com" target="_blank" rel="noopener noreferrer">Who.Is</a></li>
+<li><a href="https://urlscan.io/result/019e1dc6-67d3-768b-b7ae-f68b992fd6cc/" target="_blank" rel="noopener noreferrer">URLScan.io</a></li>
+<li><a href="https://www.urlvoid.com/scan/pubnub.com/" target="_blank" rel="noopener noreferrer">URLVoid.com</a></li>
+<li><a href="https://exchange.xforce.ibmcloud.com/url/pubnub.com" target="_blank" rel="noopener noreferrer">IBMcloud.com</a></li>
+<li><a href="https://www.virustotal.com/gui/url/69259c639e7b26e092ef3ec7894d6a0a8684b1b08d7a4381c71e98fc55a29181/detection/u-69259c639e7b26e092ef3ec7894d6a0a8684b1b08d7a4381c71e98fc55a29181-1778616023" target="_blank" rel="noopener noreferrer">VirusTotal</a></li>
+<li><a href="https://www.abuseipdb.com/check/pubnub.com" target="_blank" rel="noopener noreferrer">AbuseIPdb.com</a></li>
+<li><a href="https://www.threatminer.org/domain.php?q=pubnub.com" target="_blank" rel="noopener noreferrer">ThreatMiner.org</a></li>
+<li><a href="https://otx.alienvault.com/indicator/domain/pubnub.com" target="_blank" rel="noopener noreferrer">AlienVault.com</a></li>
+<li><a href="https://www.robtex.com/dns-lookup/pubnub.com" target="_blank" rel="noopener noreferrer">Robtex.com</a></li>
+<li><a href="https://www.shodan.io/search?query=pubnub.com" target="_blank" rel="noopener noreferrer">Shodan.io</a></li>
+<li><a href="https://sitecheck.sucuri.net/results/pubnub.com" target="_blank" rel="noopener noreferrer">Securi.net</a></li>
+<li><a href="https://www.dns.ninja/?dns=pubnub.com" target="_blank" rel="noopener noreferrer">DNS.ninja</a></li>
+<li><a href="https://securitytrails.com/domain/pubnub.com/history/a" target="_blank" rel="noopener noreferrer">SecurityTrails.com</a></li>
+              </ul>
+            </details>
+          </div>
+        </article>
+        <article class="indicator-card" id="indicator-app-measurement-com-7">
+          <header class="indicator-head">
+            <div>
+              <p class="eyebrow">Indicator 7</p>
+              <h2 class="indicator-title"><a href="https://dnslytics.com/domain/app-measurement.com" target="_blank" rel="noopener noreferrer">app-measurement.com</a></h2>
+              <div class="pill-row">
+                <span class="pill">Domain or URL</span>
+                
+                <span class="pill">DE</span>
+                <span class="pill">ASN AS15169</span>
+                <span class="pill">0 hosts</span>
+                <span class="pill">0 URLs</span>
+              </div>
+            </div>
+            <div class="timestamp">2026-05-12 20:00:30 UTC</div>
+          </header>
+
+          <div class="indicator-body">
+            
+            <details open>
+              <summary><span>Investigation Summary</span></summary>
+              <div class="table-wrap">
+                <table class="summary-table">
+                  <tr><th>Submitted URL</th><td>http://app-measurement.com/</td></tr>
+<tr><th>Effective URL</th><td>https://app-measurement.com/</td></tr>
+<tr><th>Landing Domain</th><td>app-measurement.com</td></tr>
+<tr><th>IP Address</th><td>2a00:1450:4001:c13::65</td></tr>
+<tr><th>Server</th><td>sffe</td></tr>
+<tr><th>Country</th><td>DE</td></tr>
+<tr><th>City</th><td>Frankfurt am Main</td></tr>
+<tr><th>ASN Name</th><td>GOOGLE - Google LLC, US</td></tr>
+<tr><th>ASN Number</th><td>AS15169</td></tr>
+<tr><th>Malware</th><td>0</td></tr>
+<tr><th>Ads Blocked</th><td>0</td></tr>
+<tr><th>Outgoing Links</th><td>www.google.com</td></tr>
+<tr><th>VirusTotal Detections</th><td>0 / 93</td></tr>
+<tr><th>APIVoid Detections</th><td>0</td></tr>
+<tr><th>APIVoid Blacklists</th><td>n/a</td></tr>
+<tr><th>Domain Registration</th><td>Unknown</td></tr>
+                </table>
+              </div>
+            </details>
+                        <details class="rdap-whois" open>
+              <summary><span>RDAP / WHOIS</span><span class="panel-count">16 items</span></summary>
+              <pre>RDAP query: https://rdap.verisign.com/com/v1/domain/app-measurement.com
+Object class: domain
+Domain: APP-MEASUREMENT.COM
+Handle: 1940386719_DOMAIN_COM-VRSN
+Status: client delete prohibited, client transfer prohibited, client update prohibited
+
+Events:
+ - registration: 06/19/2015 20:13:31
+ - expiration: 06/19/2026 20:13:31
+ - last changed: 05/18/2025 10:10:14
+ - last update of RDAP database: 05/12/2026 20:05:00
+
+Entities:
+ - registrar: MarkMonitor Inc.
+
+Notices:
+ - Terms of Service
+ - Status Codes
+ - RDDS Inaccuracy Complaint Form</pre>
+            </details>
+                        <details class="full" open>
+              <summary><span>URLScan Screenshot</span></summary>
+              <a class="screenshot-link" href="https://urlscan.io/screenshots/019e1dc6-bc45-76ec-847b-769ee084ba65.png" target="_blank" rel="noopener noreferrer"><img src="https://urlscan.io/screenshots/019e1dc6-bc45-76ec-847b-769ee084ba65.png" alt="URLScan screenshot for app-measurement.com"></a>
+            </details>
+            <details class="full">
+              <summary><span>Lookup Resources</span></summary>
+              <ul class="link-grid">
+                <li><a href="https://whois.domaintools.com/app-measurement.com" target="_blank" rel="noopener noreferrer">DomainTools</a></li>
+<li><a href="https://who.is/rdap/app-measurement.com" target="_blank" rel="noopener noreferrer">Who.Is</a></li>
+<li><a href="https://urlscan.io/result/019e1dc6-bc45-76ec-847b-769ee084ba65/" target="_blank" rel="noopener noreferrer">URLScan.io</a></li>
+<li><a href="https://www.urlvoid.com/scan/app-measurement.com/" target="_blank" rel="noopener noreferrer">URLVoid.com</a></li>
+<li><a href="https://exchange.xforce.ibmcloud.com/url/app-measurement.com" target="_blank" rel="noopener noreferrer">IBMcloud.com</a></li>
+<li><a href="https://www.virustotal.com/gui/url/a25c9c0147b99d505b5478b1fb712114c4d4d727675ec04bbf4275bb7f2076de/detection/u-a25c9c0147b99d505b5478b1fb712114c4d4d727675ec04bbf4275bb7f2076de-1778616044" target="_blank" rel="noopener noreferrer">VirusTotal</a></li>
+<li><a href="https://www.abuseipdb.com/check/app-measurement.com" target="_blank" rel="noopener noreferrer">AbuseIPdb.com</a></li>
+<li><a href="https://www.threatminer.org/domain.php?q=app-measurement.com" target="_blank" rel="noopener noreferrer">ThreatMiner.org</a></li>
+<li><a href="https://otx.alienvault.com/indicator/domain/app-measurement.com" target="_blank" rel="noopener noreferrer">AlienVault.com</a></li>
+<li><a href="https://www.robtex.com/dns-lookup/app-measurement.com" target="_blank" rel="noopener noreferrer">Robtex.com</a></li>
+<li><a href="https://www.shodan.io/search?query=app-measurement.com" target="_blank" rel="noopener noreferrer">Shodan.io</a></li>
+<li><a href="https://sitecheck.sucuri.net/results/app-measurement.com" target="_blank" rel="noopener noreferrer">Securi.net</a></li>
+<li><a href="https://www.dns.ninja/?dns=app-measurement.com" target="_blank" rel="noopener noreferrer">DNS.ninja</a></li>
+<li><a href="https://securitytrails.com/domain/app-measurement.com/history/a" target="_blank" rel="noopener noreferrer">SecurityTrails.com</a></li>
+              </ul>
+            </details>
+          </div>
+        </article>
+        <article class="indicator-card" id="indicator-b-scorecardresearch-com-8">
+          <header class="indicator-head">
+            <div>
+              <p class="eyebrow">Indicator 8</p>
+              <h2 class="indicator-title"><a href="https://dnslytics.com/domain/b.scorecardresearch.com" target="_blank" rel="noopener noreferrer">b.scorecardresearch.com</a></h2>
+              <div class="pill-row">
+                <span class="pill">Domain or URL</span>
+                
+                <span class="pill">US</span>
+                <span class="pill">ASN AS16509</span>
+                <span class="pill">0 hosts</span>
+                <span class="pill">0 URLs</span>
+              </div>
+            </div>
+            <div class="timestamp">2026-05-12 20:00:51 UTC</div>
+          </header>
+
+          <div class="indicator-body">
+            
+            <details open>
+              <summary><span>Investigation Summary</span></summary>
+              <div class="table-wrap">
+                <table class="summary-table">
+                  <tr><th>Submitted URL</th><td>http://b.scorecardresearch.com/</td></tr>
+<tr><th>Effective URL</th><td>https://b.scorecardresearch.com/index.html</td></tr>
+<tr><th>Landing Domain</th><td>b.scorecardresearch.com</td></tr>
+<tr><th>IP Address</th><td>3.173.161.116</td></tr>
+<tr><th>Server</th><td>AmazonS3</td></tr>
+<tr><th>Country</th><td>US</td></tr>
+<tr><th>ASN Name</th><td>AMAZON-02 - Amazon.com, Inc., US</td></tr>
+<tr><th>ASN Number</th><td>AS16509</td></tr>
+<tr><th>Malware</th><td>0</td></tr>
+<tr><th>Ads Blocked</th><td>0</td></tr>
+<tr><th>VirusTotal Detections</th><td>0 / 93</td></tr>
+<tr><th>APIVoid Detections</th><td>0</td></tr>
+<tr><th>APIVoid Blacklists</th><td>n/a</td></tr>
+<tr><th>Domain Registration</th><td>Unknown</td></tr>
+                </table>
+              </div>
+            </details>
+                        <details class="rdap-whois" open>
+              <summary><span>RDAP / WHOIS</span><span class="panel-count">0 items</span></summary>
+              <p class="empty">No RDAP details captured.</p>
+            </details>
+                        <details class="full" open>
+              <summary><span>URLScan Screenshot</span></summary>
+              <a class="screenshot-link" href="https://urlscan.io/screenshots/019e1dc7-0f41-7597-ac8d-c67f42c1f4de.png" target="_blank" rel="noopener noreferrer"><img src="https://urlscan.io/screenshots/019e1dc7-0f41-7597-ac8d-c67f42c1f4de.png" alt="URLScan screenshot for b.scorecardresearch.com"></a>
+            </details>
+            <details class="full">
+              <summary><span>Lookup Resources</span></summary>
+              <ul class="link-grid">
+                <li><a href="https://whois.domaintools.com/b.scorecardresearch.com" target="_blank" rel="noopener noreferrer">DomainTools</a></li>
+<li><a href="https://who.is/rdap/b.scorecardresearch.com" target="_blank" rel="noopener noreferrer">Who.Is</a></li>
+<li><a href="https://urlscan.io/result/019e1dc7-0f41-7597-ac8d-c67f42c1f4de/" target="_blank" rel="noopener noreferrer">URLScan.io</a></li>
+<li><a href="https://www.urlvoid.com/scan/b.scorecardresearch.com/" target="_blank" rel="noopener noreferrer">URLVoid.com</a></li>
+<li><a href="https://exchange.xforce.ibmcloud.com/url/b.scorecardresearch.com" target="_blank" rel="noopener noreferrer">IBMcloud.com</a></li>
+<li><a href="https://www.virustotal.com/gui/url/bc910cfb21a188032f8b808b5f73318ecfc8e9a67fb579a3aea8699a5fe57232/detection/u-bc910cfb21a188032f8b808b5f73318ecfc8e9a67fb579a3aea8699a5fe57232-1778616065" target="_blank" rel="noopener noreferrer">VirusTotal</a></li>
+<li><a href="https://www.abuseipdb.com/check/b.scorecardresearch.com" target="_blank" rel="noopener noreferrer">AbuseIPdb.com</a></li>
+<li><a href="https://www.threatminer.org/domain.php?q=b.scorecardresearch.com" target="_blank" rel="noopener noreferrer">ThreatMiner.org</a></li>
+<li><a href="https://otx.alienvault.com/indicator/domain/b.scorecardresearch.com" target="_blank" rel="noopener noreferrer">AlienVault.com</a></li>
+<li><a href="https://www.robtex.com/dns-lookup/b.scorecardresearch.com" target="_blank" rel="noopener noreferrer">Robtex.com</a></li>
+<li><a href="https://www.shodan.io/search?query=b.scorecardresearch.com" target="_blank" rel="noopener noreferrer">Shodan.io</a></li>
+<li><a href="https://sitecheck.sucuri.net/results/b.scorecardresearch.com" target="_blank" rel="noopener noreferrer">Securi.net</a></li>
+<li><a href="https://www.dns.ninja/?dns=b.scorecardresearch.com" target="_blank" rel="noopener noreferrer">DNS.ninja</a></li>
+<li><a href="https://securitytrails.com/domain/b.scorecardresearch.com/history/a" target="_blank" rel="noopener noreferrer">SecurityTrails.com</a></li>
+              </ul>
+            </details>
+          </div>
+        </article>
+        <article class="indicator-card" id="indicator-assets-tapad-com-9">
+          <header class="indicator-head">
+            <div>
+              <p class="eyebrow">Indicator 9</p>
+              <h2 class="indicator-title"><a href="https://dnslytics.com/domain/assets.tapad.com" target="_blank" rel="noopener noreferrer">assets.tapad.com</a></h2>
+              <div class="pill-row">
+                <span class="pill">Domain or URL</span>
+                
+                <span class="pill">Unknown country</span>
+                <span class="pill">Unknown ASN</span>
+                <span class="pill">0 hosts</span>
+                <span class="pill">0 URLs</span>
+              </div>
+            </div>
+            <div class="timestamp">2026-05-12 20:05:59 UTC</div>
+          </header>
+
+          <div class="indicator-body">
+            
+            <details open>
+              <summary><span>Investigation Summary</span></summary>
+              <div class="table-wrap">
+                <table class="summary-table">
+                  <tr><th>Submitted URL</th><td>assets.tapad.com</td></tr>
+<tr><th>VirusTotal Detections</th><td>0 / 93</td></tr>
+<tr><th>APIVoid Detections</th><td>0</td></tr>
+<tr><th>APIVoid Blacklists</th><td>n/a</td></tr>
+<tr><th>Domain Registration</th><td>Unknown</td></tr>
+                </table>
+              </div>
+            </details>
+                        <details class="rdap-whois" open>
+              <summary><span>RDAP / WHOIS</span><span class="panel-count">0 items</span></summary>
+              <p class="empty">No RDAP details captured.</p>
+            </details>
+            
+            <details class="full">
+              <summary><span>Lookup Resources</span></summary>
+              <ul class="link-grid">
+                <li><a href="https://whois.domaintools.com/assets.tapad.com" target="_blank" rel="noopener noreferrer">DomainTools</a></li>
+<li><a href="https://who.is/rdap/assets.tapad.com" target="_blank" rel="noopener noreferrer">Who.Is</a></li>
+<li><a href="https://www.urlvoid.com/scan/assets.tapad.com/" target="_blank" rel="noopener noreferrer">URLVoid.com</a></li>
+<li><a href="https://exchange.xforce.ibmcloud.com/url/assets.tapad.com" target="_blank" rel="noopener noreferrer">IBMcloud.com</a></li>
+<li><a href="https://www.virustotal.com/gui/url/19df7f239a9a1778cefdfd94bfb206f431d7e26f54fa67d6c2170f1c3d76d1f2/detection/u-19df7f239a9a1778cefdfd94bfb206f431d7e26f54fa67d6c2170f1c3d76d1f2-1778616086" target="_blank" rel="noopener noreferrer">VirusTotal</a></li>
+<li><a href="https://www.abuseipdb.com/check/assets.tapad.com" target="_blank" rel="noopener noreferrer">AbuseIPdb.com</a></li>
+<li><a href="https://www.threatminer.org/domain.php?q=assets.tapad.com" target="_blank" rel="noopener noreferrer">ThreatMiner.org</a></li>
+<li><a href="https://otx.alienvault.com/indicator/domain/assets.tapad.com" target="_blank" rel="noopener noreferrer">AlienVault.com</a></li>
+<li><a href="https://www.robtex.com/dns-lookup/assets.tapad.com" target="_blank" rel="noopener noreferrer">Robtex.com</a></li>
+<li><a href="https://www.shodan.io/search?query=assets.tapad.com" target="_blank" rel="noopener noreferrer">Shodan.io</a></li>
+<li><a href="https://sitecheck.sucuri.net/results/assets.tapad.com" target="_blank" rel="noopener noreferrer">Securi.net</a></li>
+<li><a href="https://www.dns.ninja/?dns=assets.tapad.com" target="_blank" rel="noopener noreferrer">DNS.ninja</a></li>
+<li><a href="https://securitytrails.com/domain/assets.tapad.com/history/a" target="_blank" rel="noopener noreferrer">SecurityTrails.com</a></li>
+              </ul>
+            </details>
+          </div>
+        </article>
+        <article class="indicator-card" id="indicator-bidder-criteo-com-10">
+          <header class="indicator-head">
+            <div>
+              <p class="eyebrow">Indicator 10</p>
+              <h2 class="indicator-title"><a href="https://dnslytics.com/domain/bidder.criteo.com" target="_blank" rel="noopener noreferrer">bidder.criteo.com</a></h2>
+              <div class="pill-row">
+                <span class="pill">Domain or URL</span>
+                
+                <span class="pill">FR</span>
+                <span class="pill">ASN AS44788</span>
+                <span class="pill">0 hosts</span>
+                <span class="pill">0 URLs</span>
+              </div>
+            </div>
+            <div class="timestamp">2026-05-12 20:01:33 UTC</div>
+          </header>
+
+          <div class="indicator-body">
+            
+            <details open>
+              <summary><span>Investigation Summary</span></summary>
+              <div class="table-wrap">
+                <table class="summary-table">
+                  <tr><th>Submitted URL</th><td>http://bidder.criteo.com/</td></tr>
+<tr><th>Effective URL</th><td>https://bidder.criteo.com/</td></tr>
+<tr><th>Landing Domain</th><td>bidder.criteo.com</td></tr>
+<tr><th>IP Address</th><td>2a02:2638:3::39</td></tr>
+<tr><th>Country</th><td>FR</td></tr>
+<tr><th>ASN Name</th><td>ASN-CRITEO-EUROPE Criteo Technology SAS, FR</td></tr>
+<tr><th>ASN Number</th><td>AS44788</td></tr>
+<tr><th>Malware</th><td>0</td></tr>
+<tr><th>Ads Blocked</th><td>0</td></tr>
+<tr><th>VirusTotal Detections</th><td>0 / 93</td></tr>
+<tr><th>APIVoid Detections</th><td>0</td></tr>
+<tr><th>APIVoid Blacklists</th><td>n/a</td></tr>
+<tr><th>Domain Registration</th><td>Unknown</td></tr>
+                </table>
+              </div>
+            </details>
+                        <details class="rdap-whois" open>
+              <summary><span>RDAP / WHOIS</span><span class="panel-count">0 items</span></summary>
+              <p class="empty">No RDAP details captured.</p>
+            </details>
+                        <details class="full" open>
+              <summary><span>URLScan Screenshot</span></summary>
+              <a class="screenshot-link" href="https://urlscan.io/screenshots/019e1dc7-b47c-74b8-beaf-b7fe62091ad6.png" target="_blank" rel="noopener noreferrer"><img src="https://urlscan.io/screenshots/019e1dc7-b47c-74b8-beaf-b7fe62091ad6.png" alt="URLScan screenshot for bidder.criteo.com"></a>
+            </details>
+            <details class="full">
+              <summary><span>Lookup Resources</span></summary>
+              <ul class="link-grid">
+                <li><a href="https://whois.domaintools.com/bidder.criteo.com" target="_blank" rel="noopener noreferrer">DomainTools</a></li>
+<li><a href="https://who.is/rdap/bidder.criteo.com" target="_blank" rel="noopener noreferrer">Who.Is</a></li>
+<li><a href="https://urlscan.io/result/019e1dc7-b47c-74b8-beaf-b7fe62091ad6/" target="_blank" rel="noopener noreferrer">URLScan.io</a></li>
+<li><a href="https://www.urlvoid.com/scan/bidder.criteo.com/" target="_blank" rel="noopener noreferrer">URLVoid.com</a></li>
+<li><a href="https://exchange.xforce.ibmcloud.com/url/bidder.criteo.com" target="_blank" rel="noopener noreferrer">IBMcloud.com</a></li>
+<li><a href="https://www.virustotal.com/gui/url/691f554f7e1e15288c77d7f5fb3b13c1c8aaec2d2fed3aa743b240442fc9ad76/detection/u-691f554f7e1e15288c77d7f5fb3b13c1c8aaec2d2fed3aa743b240442fc9ad76-1778616107" target="_blank" rel="noopener noreferrer">VirusTotal</a></li>
+<li><a href="https://www.abuseipdb.com/check/bidder.criteo.com" target="_blank" rel="noopener noreferrer">AbuseIPdb.com</a></li>
+<li><a href="https://www.threatminer.org/domain.php?q=bidder.criteo.com" target="_blank" rel="noopener noreferrer">ThreatMiner.org</a></li>
+<li><a href="https://otx.alienvault.com/indicator/domain/bidder.criteo.com" target="_blank" rel="noopener noreferrer">AlienVault.com</a></li>
+<li><a href="https://www.robtex.com/dns-lookup/bidder.criteo.com" target="_blank" rel="noopener noreferrer">Robtex.com</a></li>
+<li><a href="https://www.shodan.io/search?query=bidder.criteo.com" target="_blank" rel="noopener noreferrer">Shodan.io</a></li>
+<li><a href="https://sitecheck.sucuri.net/results/bidder.criteo.com" target="_blank" rel="noopener noreferrer">Securi.net</a></li>
+<li><a href="https://www.dns.ninja/?dns=bidder.criteo.com" target="_blank" rel="noopener noreferrer">DNS.ninja</a></li>
+<li><a href="https://securitytrails.com/domain/bidder.criteo.com/history/a" target="_blank" rel="noopener noreferrer">SecurityTrails.com</a></li>
+              </ul>
+            </details>
+          </div>
+        </article>
+        <article class="indicator-card" id="indicator-api-2-0-spot-im-11">
+          <header class="indicator-head">
+            <div>
+              <p class="eyebrow">Indicator 11</p>
+              <h2 class="indicator-title"><a href="https://dnslytics.com/domain/api-2-0.spot.im" target="_blank" rel="noopener noreferrer">api-2-0.spot.im</a></h2>
+              <div class="pill-row">
+                <span class="pill">Domain or URL</span>
+                
+                <span class="pill">US</span>
+                <span class="pill">ASN AS16509</span>
+                <span class="pill">0 hosts</span>
+                <span class="pill">0 URLs</span>
+              </div>
+            </div>
+            <div class="timestamp">2026-05-12 20:01:55 UTC</div>
+          </header>
+
+          <div class="indicator-body">
+            
+            <details open>
+              <summary><span>Investigation Summary</span></summary>
+              <div class="table-wrap">
+                <table class="summary-table">
+                  <tr><th>Submitted URL</th><td>http://api-2-0.spot.im/</td></tr>
+<tr><th>Effective URL</th><td>https://api-2-0.spot.im/</td></tr>
+<tr><th>Landing Domain</th><td>api-2-0.spot.im</td></tr>
+<tr><th>IP Address</th><td>2600:9000:208a:3400:e:f48e:3c00:93a1</td></tr>
+<tr><th>Server</th><td>fasthttp</td></tr>
+<tr><th>Country</th><td>US</td></tr>
+<tr><th>ASN Name</th><td>AMAZON-02 - Amazon.com, Inc., US</td></tr>
+<tr><th>ASN Number</th><td>AS16509</td></tr>
+<tr><th>Malware</th><td>0</td></tr>
+<tr><th>Ads Blocked</th><td>0</td></tr>
+<tr><th>VirusTotal Detections</th><td>0 / 93</td></tr>
+<tr><th>APIVoid Detections</th><td>0</td></tr>
+<tr><th>APIVoid Blacklists</th><td>n/a</td></tr>
+<tr><th>Domain Registration</th><td>Unknown</td></tr>
+                </table>
+              </div>
+            </details>
+                        <details class="rdap-whois" open>
+              <summary><span>RDAP / WHOIS</span><span class="panel-count">0 items</span></summary>
+              <p class="empty">No RDAP details captured.</p>
+            </details>
+                        <details class="full" open>
+              <summary><span>URLScan Screenshot</span></summary>
+              <a class="screenshot-link" href="https://urlscan.io/screenshots/019e1dc8-07b8-743f-8892-4293c53772cf.png" target="_blank" rel="noopener noreferrer"><img src="https://urlscan.io/screenshots/019e1dc8-07b8-743f-8892-4293c53772cf.png" alt="URLScan screenshot for api-2-0.spot.im"></a>
+            </details>
+            <details class="full">
+              <summary><span>Lookup Resources</span></summary>
+              <ul class="link-grid">
+                <li><a href="https://whois.domaintools.com/api-2-0.spot.im" target="_blank" rel="noopener noreferrer">DomainTools</a></li>
+<li><a href="https://who.is/rdap/api-2-0.spot.im" target="_blank" rel="noopener noreferrer">Who.Is</a></li>
+<li><a href="https://urlscan.io/result/019e1dc8-07b8-743f-8892-4293c53772cf/" target="_blank" rel="noopener noreferrer">URLScan.io</a></li>
+<li><a href="https://www.urlvoid.com/scan/api-2-0.spot.im/" target="_blank" rel="noopener noreferrer">URLVoid.com</a></li>
+<li><a href="https://exchange.xforce.ibmcloud.com/url/api-2-0.spot.im" target="_blank" rel="noopener noreferrer">IBMcloud.com</a></li>
+<li><a href="https://www.virustotal.com/gui/url/7f8d88d09aa45aa141e8293f95a4ae6c276496aa5ce8b39ddbfa7264cc915922/detection/u-7f8d88d09aa45aa141e8293f95a4ae6c276496aa5ce8b39ddbfa7264cc915922-1778616129" target="_blank" rel="noopener noreferrer">VirusTotal</a></li>
+<li><a href="https://www.abuseipdb.com/check/api-2-0.spot.im" target="_blank" rel="noopener noreferrer">AbuseIPdb.com</a></li>
+<li><a href="https://www.threatminer.org/domain.php?q=api-2-0.spot.im" target="_blank" rel="noopener noreferrer">ThreatMiner.org</a></li>
+<li><a href="https://otx.alienvault.com/indicator/domain/api-2-0.spot.im" target="_blank" rel="noopener noreferrer">AlienVault.com</a></li>
+<li><a href="https://www.robtex.com/dns-lookup/api-2-0.spot.im" target="_blank" rel="noopener noreferrer">Robtex.com</a></li>
+<li><a href="https://www.shodan.io/search?query=api-2-0.spot.im" target="_blank" rel="noopener noreferrer">Shodan.io</a></li>
+<li><a href="https://sitecheck.sucuri.net/results/api-2-0.spot.im" target="_blank" rel="noopener noreferrer">Securi.net</a></li>
+<li><a href="https://www.dns.ninja/?dns=api-2-0.spot.im" target="_blank" rel="noopener noreferrer">DNS.ninja</a></li>
+<li><a href="https://securitytrails.com/domain/api-2-0.spot.im/history/a" target="_blank" rel="noopener noreferrer">SecurityTrails.com</a></li>
+              </ul>
+            </details>
+          </div>
+        </article>
+        <article class="indicator-card" id="indicator-https-thehackernews-com-2026-05-new-trickmo-variant-uses-ton-c2-and-html-12">
+          <header class="indicator-head">
+            <div>
+              <p class="eyebrow">Indicator 12</p>
+              <h2 class="indicator-title"><a href="https://dnslytics.com/domain/thehackernews.com" target="_blank" rel="noopener noreferrer">https://thehackernews.com/2026/05/new-trickmo-variant-uses-ton-c2-and.html</a></h2>
+              <div class="pill-row">
+                <span class="pill">Domain or URL</span>
+                
+                <span class="pill">Unknown country</span>
+                <span class="pill">ASN AS13335</span>
+                <span class="pill">0 hosts</span>
+                <span class="pill">0 URLs</span>
+              </div>
+            </div>
+            <div class="timestamp">2026-05-12 20:02:17 UTC</div>
+          </header>
+
+          <div class="indicator-body">
+            
+            <details open>
+              <summary><span>Investigation Summary</span></summary>
+              <div class="table-wrap">
+                <table class="summary-table">
+                  <tr><th>Submitted URL</th><td>https://thehackernews.com/2026/05/new-trickmo-variant-uses-ton-c2-and.html</td></tr>
+<tr><th>Effective URL</th><td>https://thehackernews.com/2026/05/new-trickmo-variant-uses-ton-c2-and.html</td></tr>
+<tr><th>Landing Domain</th><td>thehackernews.com</td></tr>
+<tr><th>IP Address</th><td>172.67.72.95</td></tr>
+<tr><th>Server</th><td>cloudflare</td></tr>
+<tr><th>ASN Name</th><td>CLOUDFLARENET - Cloudflare, Inc., US</td></tr>
+<tr><th>ASN Number</th><td>AS13335</td></tr>
+<tr><th>Malware</th><td>0</td></tr>
+<tr><th>Ads Blocked</th><td>0</td></tr>
+<tr><th>Outgoing Links</th><td>twitter.com, www.linkedin.com, www.facebook.com, awards.thehackernews.com, thehackernews.tradepub.com, www.youtube.com, www.instagram.com, feeds.feedburner.com, thehackernews.uk, blogger.googleusercontent.com, www.threatfabric.com, www.virustotal.com, news.google.com, www.reddit.com, news.ycombinator.com, api.whatsapp.com, telegram.me, thehacker.news</td></tr>
+<tr><th>VirusTotal Detections</th><td>0 / 93</td></tr>
+<tr><th>APIVoid Detections</th><td>0</td></tr>
+<tr><th>APIVoid Blacklists</th><td>n/a</td></tr>
+<tr><th>Domain Registration</th><td>Unknown</td></tr>
+                </table>
+              </div>
+            </details>
+                        <details class="rdap-whois" open>
+              <summary><span>RDAP / WHOIS</span><span class="panel-count">16 items</span></summary>
+              <pre>RDAP query: https://rdap.verisign.com/com/v1/domain/thehackernews.com
+Object class: domain
+Domain: THEHACKERNEWS.COM
+Handle: 1622465847_DOMAIN_COM-VRSN
+Status: client delete prohibited, client transfer prohibited, client update prohibited
+
+Events:
+ - registration: 10/27/2010 11:06:33
+ - expiration: 10/27/2034 11:06:33
+ - last changed: 07/02/2025 07:12:46
+ - last update of RDAP database: 05/12/2026 20:06:45
+
+Entities:
+ - registrar: Squarespace Domains LLC
+
+Notices:
+ - Terms of Service
+ - Status Codes
+ - RDDS Inaccuracy Complaint Form</pre>
+            </details>
+                        <details class="full" open>
+              <summary><span>URLScan Screenshot</span></summary>
+              <a class="screenshot-link" href="https://urlscan.io/screenshots/019e1dc8-5acc-7327-a278-6ffdefc4d6ce.png" target="_blank" rel="noopener noreferrer"><img src="https://urlscan.io/screenshots/019e1dc8-5acc-7327-a278-6ffdefc4d6ce.png" alt="URLScan screenshot for https://thehackernews.com/2026/05/new-trickmo-variant-uses-ton-c2-and.html"></a>
+            </details>
+            <details class="full">
+              <summary><span>Lookup Resources</span></summary>
+              <ul class="link-grid">
+                <li><a href="https://whois.domaintools.com/thehackernews.com" target="_blank" rel="noopener noreferrer">DomainTools</a></li>
+<li><a href="https://who.is/rdap/thehackernews.com" target="_blank" rel="noopener noreferrer">Who.Is</a></li>
+<li><a href="https://urlscan.io/result/019e1dc8-5acc-7327-a278-6ffdefc4d6ce/" target="_blank" rel="noopener noreferrer">URLScan.io</a></li>
+<li><a href="https://www.urlvoid.com/scan/thehackernews.com/" target="_blank" rel="noopener noreferrer">URLVoid.com</a></li>
+<li><a href="https://exchange.xforce.ibmcloud.com/url/thehackernews.com" target="_blank" rel="noopener noreferrer">IBMcloud.com</a></li>
+<li><a href="https://www.virustotal.com/gui/url/ea160e3abda77a30108028b610bdb6241d02d6da44014d142467d358a928234f/detection/u-ea160e3abda77a30108028b610bdb6241d02d6da44014d142467d358a928234f-1778616150" target="_blank" rel="noopener noreferrer">VirusTotal</a></li>
+<li><a href="https://www.abuseipdb.com/check/thehackernews.com" target="_blank" rel="noopener noreferrer">AbuseIPdb.com</a></li>
+<li><a href="https://www.threatminer.org/domain.php?q=thehackernews.com" target="_blank" rel="noopener noreferrer">ThreatMiner.org</a></li>
+<li><a href="https://otx.alienvault.com/indicator/domain/thehackernews.com" target="_blank" rel="noopener noreferrer">AlienVault.com</a></li>
+<li><a href="https://www.robtex.com/dns-lookup/thehackernews.com" target="_blank" rel="noopener noreferrer">Robtex.com</a></li>
+<li><a href="https://www.shodan.io/search?query=thehackernews.com" target="_blank" rel="noopener noreferrer">Shodan.io</a></li>
+<li><a href="https://sitecheck.sucuri.net/results/thehackernews.com" target="_blank" rel="noopener noreferrer">Securi.net</a></li>
+<li><a href="https://www.dns.ninja/?dns=thehackernews.com" target="_blank" rel="noopener noreferrer">DNS.ninja</a></li>
+<li><a href="https://securitytrails.com/domain/thehackernews.com/history/a" target="_blank" rel="noopener noreferrer">SecurityTrails.com</a></li>
+              </ul>
+            </details>
+          </div>
+        </article>
+        <article class="indicator-card" id="indicator-https-thehackernews-com-2026-05-your-purple-team-isnt-purple-its-just-html-13">
+          <header class="indicator-head">
+            <div>
+              <p class="eyebrow">Indicator 13</p>
+              <h2 class="indicator-title"><a href="https://dnslytics.com/domain/thehackernews.com" target="_blank" rel="noopener noreferrer">https://thehackernews.com/2026/05/your-purple-team-isnt-purple-its-just.html</a></h2>
+              <div class="pill-row">
+                <span class="pill">Domain or URL</span>
+                
+                <span class="pill">Unknown country</span>
+                <span class="pill">ASN AS13335</span>
+                <span class="pill">0 hosts</span>
+                <span class="pill">0 URLs</span>
+              </div>
+            </div>
+            <div class="timestamp">2026-05-12 20:02:43 UTC</div>
+          </header>
+
+          <div class="indicator-body">
+            
+            <details open>
+              <summary><span>Investigation Summary</span></summary>
+              <div class="table-wrap">
+                <table class="summary-table">
+                  <tr><th>Submitted URL</th><td>https://thehackernews.com/2026/05/your-purple-team-isnt-purple-its-just.html</td></tr>
+<tr><th>Effective URL</th><td>https://thehackernews.com/2026/05/your-purple-team-isnt-purple-its-just.html</td></tr>
+<tr><th>Landing Domain</th><td>thehackernews.com</td></tr>
+<tr><th>IP Address</th><td>104.26.11.117</td></tr>
+<tr><th>Server</th><td>cloudflare</td></tr>
+<tr><th>ASN Name</th><td>CLOUDFLARENET - Cloudflare, Inc., US</td></tr>
+<tr><th>ASN Number</th><td>AS13335</td></tr>
+<tr><th>Malware</th><td>0</td></tr>
+<tr><th>Ads Blocked</th><td>0</td></tr>
+<tr><th>Outgoing Links</th><td>twitter.com, www.linkedin.com, www.facebook.com, awards.thehackernews.com, thehackernews.tradepub.com, www.youtube.com, www.instagram.com, feeds.feedburner.com, thehackernews.uk, blogger.googleusercontent.com, www.picussecurity.com, hubs.ly, hubs.li, news.google.com, www.reddit.com, news.ycombinator.com, api.whatsapp.com, telegram.me, thehacker.news</td></tr>
+<tr><th>VirusTotal Detections</th><td>0 / 93</td></tr>
+<tr><th>APIVoid Detections</th><td>0</td></tr>
+<tr><th>APIVoid Blacklists</th><td>n/a</td></tr>
+<tr><th>Domain Registration</th><td>Unknown</td></tr>
+                </table>
+              </div>
+            </details>
+                        <details class="rdap-whois" open>
+              <summary><span>RDAP / WHOIS</span><span class="panel-count">16 items</span></summary>
+              <pre>RDAP query: https://rdap.verisign.com/com/v1/domain/thehackernews.com
+Object class: domain
+Domain: THEHACKERNEWS.COM
+Handle: 1622465847_DOMAIN_COM-VRSN
+Status: client delete prohibited, client transfer prohibited, client update prohibited
+
+Events:
+ - registration: 10/27/2010 11:06:33
+ - expiration: 10/27/2034 11:06:33
+ - last changed: 07/02/2025 07:12:46
+ - last update of RDAP database: 05/12/2026 20:07:15
+
+Entities:
+ - registrar: Squarespace Domains LLC
+
+Notices:
+ - Terms of Service
+ - Status Codes
+ - RDDS Inaccuracy Complaint Form</pre>
+            </details>
+                        <details class="full" open>
+              <summary><span>URLScan Screenshot</span></summary>
+              <a class="screenshot-link" href="https://urlscan.io/screenshots/019e1dc8-ae63-77c8-bcc9-b7b8abca604f.png" target="_blank" rel="noopener noreferrer"><img src="https://urlscan.io/screenshots/019e1dc8-ae63-77c8-bcc9-b7b8abca604f.png" alt="URLScan screenshot for https://thehackernews.com/2026/05/your-purple-team-isnt-purple-its-just.html"></a>
+            </details>
+            <details class="full">
+              <summary><span>Lookup Resources</span></summary>
+              <ul class="link-grid">
+                <li><a href="https://whois.domaintools.com/thehackernews.com" target="_blank" rel="noopener noreferrer">DomainTools</a></li>
+<li><a href="https://who.is/rdap/thehackernews.com" target="_blank" rel="noopener noreferrer">Who.Is</a></li>
+<li><a href="https://urlscan.io/result/019e1dc8-ae63-77c8-bcc9-b7b8abca604f/" target="_blank" rel="noopener noreferrer">URLScan.io</a></li>
+<li><a href="https://www.urlvoid.com/scan/thehackernews.com/" target="_blank" rel="noopener noreferrer">URLVoid.com</a></li>
+<li><a href="https://exchange.xforce.ibmcloud.com/url/thehackernews.com" target="_blank" rel="noopener noreferrer">IBMcloud.com</a></li>
+<li><a href="https://www.virustotal.com/gui/url/85028d5d9f10f077529600469609cf91d75dcb11b524fa58b3d08000dae0e065/detection/u-85028d5d9f10f077529600469609cf91d75dcb11b524fa58b3d08000dae0e065-1778616171" target="_blank" rel="noopener noreferrer">VirusTotal</a></li>
+<li><a href="https://www.abuseipdb.com/check/thehackernews.com" target="_blank" rel="noopener noreferrer">AbuseIPdb.com</a></li>
+<li><a href="https://www.threatminer.org/domain.php?q=thehackernews.com" target="_blank" rel="noopener noreferrer">ThreatMiner.org</a></li>
+<li><a href="https://otx.alienvault.com/indicator/domain/thehackernews.com" target="_blank" rel="noopener noreferrer">AlienVault.com</a></li>
+<li><a href="https://www.robtex.com/dns-lookup/thehackernews.com" target="_blank" rel="noopener noreferrer">Robtex.com</a></li>
+<li><a href="https://www.shodan.io/search?query=thehackernews.com" target="_blank" rel="noopener noreferrer">Shodan.io</a></li>
+<li><a href="https://sitecheck.sucuri.net/results/thehackernews.com" target="_blank" rel="noopener noreferrer">Securi.net</a></li>
+<li><a href="https://www.dns.ninja/?dns=thehackernews.com" target="_blank" rel="noopener noreferrer">DNS.ninja</a></li>
+<li><a href="https://securitytrails.com/domain/thehackernews.com/history/a" target="_blank" rel="noopener noreferrer">SecurityTrails.com</a></li>
+              </ul>
+            </details>
+          </div>
+        </article>
+      </section>
+    </div>
+
+    <p class="note">This report is an enrichment aid, not a final verdict. Indicators may still be malicious even when no source flags them.</p>
+    <footer class="report-credit">Generated by <a href="https://github.com/ArronJablonowski/SOCCOM" target="_blank" rel="noopener noreferrer">SOCCOM</a> | Created by <a href="https://github.com/ArronJablonowski" target="_blank" rel="noopener noreferrer">Arron Jablonowski</a></footer>
+  </main>
+</body>
+</html>
