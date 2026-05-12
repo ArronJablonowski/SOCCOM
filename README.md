@@ -1,6 +1,6 @@
 # SOCCOM
 
-**Security Operations Center Central Command**
+**Security Operations Central Command**
 
 SOCCOM is a PowerShell-based SOC investigation assistant built to speed up common analyst workflows. It enriches indicators, generates portable HTML intelligence reports, performs Active Directory lookups, retrieves BitLocker recovery keys, and creates structured incident response notes for fast-moving investigations.
 
