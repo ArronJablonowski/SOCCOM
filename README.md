@@ -210,5 +210,5 @@ The HTML report includes this reminder:
 ![alt text](https://github.com/ArronJablonowski/SOCCOM/blob/main/img/example_html_report.png?raw=true)
 
 - Example markdown IR template
-- *Pro tip: Make your Obsidian Vault point to the 'Investigations' directory*
+  - *Pro tip: Make your Obsidian Vault point to the 'Investigations' directory*
 ![alt text](https://github.com/ArronJablonowski/SOCCOM/blob/main/img/obsidian_investigation_template.png?raw=true)
