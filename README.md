@@ -2,56 +2,99 @@
 
 **Security Operations Center Central Command**
 
-SOCCOM is a PowerShell-based SOC assistant for speeding up common analyst workflows. It enriches IPs, domains, URLs, and full URIs, builds portable HTML investigation reports, and includes Active Directory lookups for users, computers, and BitLocker recovery keys.
+SOCCOM is a PowerShell-based SOC investigation assistant built to speed up common analyst workflows. It enriches indicators, generates portable HTML intelligence reports, performs Active Directory lookups, retrieves BitLocker recovery keys, and creates structured incident response notes for fast-moving investigations.
 
-The project is designed for security operations teams that need quick triage, repeatable enrichment, and case-ready evidence without jumping between several web portals.
+The goal is simple: help analysts move from alert to documented decision faster, without losing context across browser tabs, enrichment portals, notes, and case updates.
 
-## Features
+## What SOCCOM Does
 
-- Investigate IPv4 and IPv6 addresses.
-- Investigate domains, URLs, and full URIs.
-- Investigate lists of indicators in bulk.
-- Generate timestamped HTML reports with collapsible sections.
-- Include RDAP / WHOIS registration data.
-- Include AbuseIPDB IP reputation data.
-- Include VirusTotal URL/IP enrichment.
-- Include URLScan screenshot and scan details for URL/domain investigations.
-- Include APIVoid domain reputation results.
-- Search Active Directory users and computers.
-- Search Active Directory user and computer lists.
-- Retrieve BitLocker recovery keys from Active Directory.
+- Investigates IPv4 addresses, IPv6 addresses, domains, URLs, and full URIs from one primary `-Investigate` switch.
+- Processes mixed indicator lists and builds a combined HTML report.
+- Generates timestamped, analyst-friendly reports in `Results/`.
+- Creates Markdown incident response templates in `Investigations/`.
+- Supports Active Directory searches for users, computers, user lists, and computer lists.
+- Retrieves BitLocker recovery keys from Active Directory.
+- Uses cleaner CLI error handling so failed enrichment sources do not break the investigation run.
+- Includes a self-update function designed to pull from the SOCCOM GitHub repository after the project script is published.
+
+## Enrichment Sources
+
+SOCCOM currently supports enrichment and lookup workflows using:
+
+- AbuseIPDB
+- VirusTotal
+- URLScan.io
+- APIVoid domain reputation
+- RDAP / WHOIS registration data
+- Shodan lookup links
+- DomainTools lookup links
+- Who.Is RDAP lookup links
+- IBM X-Force Exchange lookup links
+- AlienVault OTX lookup links
+- ThreatMiner lookup links
+- Robtex lookup links
+- Sucuri SiteCheck lookup links
+- DNS.ninja lookup links
+- SecurityTrails domain history links
+
+When an enrichment provider fails, returns no result, rate limits, or cannot resolve an indicator, SOCCOM continues the investigation and records the available data instead of stopping the run.
 
 ## Report Output
 
-SOCCOM produces analyst-friendly HTML reports under the `Results` directory. Reports include:
+SOCCOM generates portable HTML reports under `Results/`. Reports include:
 
 - Investigation summary
-- AbuseIPDB results
-- RDAP / WHOIS data
-- URLScan screenshots
-- VirusTotal detections
-- APIVoid detections
-- Lookup resource links
+- AbuseIPDB reputation details
+- VirusTotal detections and report links
+- URLScan screenshots and scan details when available
+- APIVoid domain reputation results
+- RDAP / WHOIS registration data
+- Lookup resource buttons for pivoting into external tools
+- Collapsible report sections for faster review
 - Timestamped filenames for easier case tracking
+- Author and project links in the report footer
 
-The report is self-contained enough to attach to cases, share with teammates, or preserve investigation context.
+Full URI investigations are normalized so the output filename uses the URI hostname instead of the entire URI.
+
+## Incident Response Notes
+
+The `-Make_IRTemplate` switch creates a timestamped Markdown investigation template under `Investigations/`.
+
+The template is designed for SOC analysts working under pressure and includes:
+
+- Executive summary / BLUF
+- Current status tracking
+- Handoff notes
+- Next actions
+- Detection metadata
+- Indicator tracking
+- Event timeline
+- Evidence log
+- Scope assessment
+- Affected hosts and users
+- Credential and identity review
+- SIEM query placeholders
+- Live incident response notes
+- Communication log
+- Data sources reviewed
+- Escalation notes
+- Containment, eradication, and recovery tracking
+- MITRE ATT&CK mapping
+- Recommendations, tuning ideas, lessons learned, and closeout rationale
 
 ## Requirements
 
-- Windows PowerShell or PowerShell 7+
-- Network access to enrichment services
+- PowerShell 7+ recommended
+- Windows PowerShell supported for many workflows
+- Network access to enrichment providers
 - Active Directory PowerShell module for AD-related functions
-- API keys for full enrichment coverage
+- Valid API keys for full enrichment coverage
 
-Primary script:
-
-```powershell
-.\SOCCOM-modern.ps1
-```
+Active Directory and BitLocker workflows are intended for domain-connected Windows environments with the required permissions.
 
 ## API Keys
 
-SOCCOM supports API keys through environment variables. This is the recommended way to run the tool because it avoids hardcoding secrets in the script.
+SOCCOM supports API keys through environment variables. This is the recommended approach because it avoids storing secrets directly in the script.
 
 ```powershell
 $env:SOCCOM_URLSCAN_API_KEY = "your-urlscan-key"
@@ -60,87 +103,105 @@ $env:SOCCOM_APIVOID_API_KEY = "your-apivoid-key"
 $env:SOCCOM_ABUSEIPDB_API_KEY = "your-abuseipdb-key"
 ```
 
-## Usage
+`SOCCOM_URLVOID_API_KEY` is also accepted as a legacy fallback for the APIVoid domain reputation key.
 
-### Investigate a Single Indicator
+## Quick Start
 
-Use `-Investigate` for IPv4, IPv6, domains, URLs, or full URIs.
-
-```powershell
-.\SOCCOM-modern.ps1 -Investigate 8.8.8.8
-.\SOCCOM-modern.ps1 -Investigate 2001:df7:3c00:800a::446:34dc
-.\SOCCOM-modern.ps1 -Investigate cyberciti.biz
-.\SOCCOM-modern.ps1 -Investigate https://www.cyberciti.biz/linux-command/
-```
-
-### Investigate a List of Indicators
+From the project root:
 
 ```powershell
-.\SOCCOM-modern.ps1 -Investigate_List .\indicators.txt
+.\SOCCOM.ps1 -Investigate example.com
 ```
 
-The list can contain a mix of IPv4 addresses, IPv6 addresses, domains, URLs, and full URIs.
-
-### Search Active Directory
-
-Search for a single user:
+Investigate an IPv4 address:
 
 ```powershell
-.\SOCCOM-modern.ps1 -SearchAD_Username jsmith
+.\SOCCOM.ps1 -Investigate 8.8.8.8
 ```
 
-Search for a single computer:
+Investigate an IPv6 address:
 
 ```powershell
-.\SOCCOM-modern.ps1 -SearchAD_ComputerName workstation-01
+.\SOCCOM.ps1 -Investigate 2001:df7:3c00:800a::446:34dc
 ```
 
-Search for a list of users:
+Investigate a full URI:
 
 ```powershell
-.\SOCCOM-modern.ps1 -SearchAD_UserList .\users.txt
+.\SOCCOM.ps1 -Investigate https://www.cyberciti.biz/linux-command/
 ```
 
-Search for a list of computers:
+Investigate a mixed list of indicators:
 
 ```powershell
-.\SOCCOM-modern.ps1 -SearchAD_ComputerList .\computers.txt
+.\SOCCOM.ps1 -Investigate_List .\list.txt
 ```
 
-### Retrieve a BitLocker Recovery Key
+Create a Markdown incident response notes template:
 
 ```powershell
-.\SOCCOM-modern.ps1 -Get_BitlockerRecoveryKey workstation-01
+.\SOCCOM.ps1 -Make_IRTemplate
 ```
 
-## Recommended Workflow
+## Command Reference
 
-1. Collect the indicator from an alert, email, proxy log, EDR event, or case note.
-2. Run SOCCOM with `-Investigate`.
-3. Review the generated HTML report in `Results`.
-4. Use the report as supporting evidence for triage, escalation, or case documentation.
+| Command | Purpose |
+| --- | --- |
+| `-Investigate <indicator>` | Investigate an IPv4 address, IPv6 address, domain, URL, or full URI. |
+| `-Investigate_List <path>` | Investigate a file containing mixed IPs, domains, URLs, or URIs. |
+| `-SearchAD_Username <username>` | Search Active Directory for a user and show detailed account properties and group membership. |
+| `-SearchAD_ComputerName <hostname>` | Search Active Directory for a computer. |
+| `-SearchAD_UserList <path>` | Search Active Directory for a list of users and export results to CSV. |
+| `-SearchAD_ComputerList <path>` | Search Active Directory for a list of computers and export results to CSV. |
+| `-Get_BitlockerRecoveryKey <hostname>` | Retrieve BitLocker recovery key information for a computer from Active Directory. |
+| `-Make_IRTemplate` | Create a timestamped Markdown SOC investigation notes file. |
 
-## Important Note
+Legacy aliases are still present for earlier function names, but new usage should prefer the command names above.
 
-SOCCOM is an enrichment aid, not a final verdict. Indicators may still be malicious even when no source flags them. Use analyst judgment and supporting telemetry before making containment or closure decisions.
-
-## Project Structure
+## Example Indicator List
 
 ```text
-SOCCOM-modern.ps1    Primary SOCCOM script
-Results/             Generated reports and CSV outputs
-Logs/                Runtime log files
+185.200.118.46
+20.163.14.5
+2001:df7:3c00:800a::446:34dc
+pubnub.com
+https://www.cyberciti.biz/linux-command/
 ```
+
+Run it with:
+
+```powershell
+.\SOCCOM.ps1 -Investigate_List .\list.txt
+```
+
+## Output Locations
+
+```text
+SOCCOM.ps1                       Main SOCCOM script
+SOC_Investigation_Template.md    Markdown source template reference
+Results/                         Generated HTML reports and CSV exports
+Investigations/                  Generated Markdown investigation notes
+Logs/                            Runtime queue and log files
+```
+
+## Design Notes
+
+SOCCOM is built for SOC triage and investigation support. It does not replace analyst judgment, SIEM/EDR telemetry, containment procedures, or escalation requirements.
+
+The HTML report includes this reminder:
+
+> Absence of a malicious verdict in this report does not guarantee the indicator is benign. Validate findings against internal telemetry, business context, and current threat intelligence before closing or containing.
 
 ## Roadmap Ideas
 
-- Additional enrichment providers
 - Hash and file reputation workflows
 - Email header analysis
-- Case export templates
-- Safer secret management
-- More Active Directory response actions
-- Optional JSON or Markdown report output
+- Optional JSON or Markdown enrichment report output
+- Case-management export templates
+- Stronger local secret management
+- Additional identity and endpoint response actions
+- More enrichment providers with configurable enable/disable options
+- Improved logging and execution summaries for bulk investigations
 
 ## Author
 
