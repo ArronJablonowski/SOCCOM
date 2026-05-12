@@ -85,7 +85,7 @@ The template is designed for SOC analysts working under pressure and includes:
 ## Requirements
 
 - PowerShell 7+ recommended
-- Windows PowerShell supported for many workflows
+- Windows PowerShell supported for multiple OS types - Tested on Windows, MacOS, & Ubuntu. 
 - Network access to enrichment providers
 - Active Directory PowerShell module for AD-related functions
 - Valid API keys for full enrichment coverage
