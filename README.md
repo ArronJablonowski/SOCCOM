@@ -202,10 +202,7 @@ The HTML report includes this reminder:
 - More enrichment providers with configurable enable/disable options
 - Improved logging and execution summaries for bulk investigations
 
-## Example Output
-- Usage via Powershell CLI
-![alt text](https://github.com/ArronJablonowski/SOCCOM/blob/main/img/example_cli.png?raw=true)
-
+## Example Reports
 - HTML report for IP, Domain, and URI investigations
 ![alt text](https://github.com/ArronJablonowski/SOCCOM/blob/main/img/example_html_report.png?raw=true)
 
