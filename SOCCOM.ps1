@@ -4,33 +4,32 @@
 
 .DESCRIPTION
  # Script by:  Arron Jablonowski #
- # Version 0.5.5                 #
- # Last modified: 5.12.2026      #  
+ # Version 0.5.4                 #
+ # Last modified: 5.12.2026     #  
  
  SOCCOM's functions include:
-   - Investigate and report on Domain names, and IP Addresses.
-   - Lookup Usernames and Computer names in Active Directory. 
-   - Create IR templates to document the IR process. 
-
+   - Investigate and report on domains, URLs, full URIs, IPv4 addresses, and IPv6 addresses.
+   - Lookup users, computers, and BitLocker recovery material in Active Directory.
+   - Create Markdown incident response notes templates for SOC investigations.
 .EXAMPLE
    SOCCOM.ps1 Examples
    - Investigate an IP, domain, URL, or full URI
         .\SOCCOM.ps1 -Investigate <domain, URL/URI, IPv4, or IPv6>
 
-   - Search a User's Name in Active Directory  
-        .\SOCCOM.ps1 -SearchAD_Username <a username>
+   - Search a User's Name in Active Directory
+        .\SOCCOM.ps1 -Search_ADUsername <a username>
 
-   - Search a Computer Name in Active Directory 
-        .\SOCCOM.ps1 -SearchAD_ComputerName <computer name>
-   
+   - Search a Computer Name in Active Directory
+        .\SOCCOM.ps1 -Search_ADComputerName <computer name>
+
    - Investigate a List of Domains and/or IPAddresses
         .\SOCCOM.ps1 -Investigate_List <~\Path\to\list\of\domains\and\IPs\file.txt>
 
    - Search a List of Usernames in Active Directory
-        .\SOCCOM.ps1 -SearchAD_UserList <~\Path\to\list\of\userNames\file.txt>
+        .\SOCCOM.ps1 -Search_ADUserList <~\Path\to\list\of\userNames\file.txt>
 
    - Search a List of Computer Names in Active Directory
-        .\SOCCOM.ps1 -SearchAD_ComputerList <~\Path\to\list\of\computerNames\file.txt>
+        .\SOCCOM.ps1 -Search_ADComputerList <~\Path\to\list\of\computerNames\file.txt>
 
    - Create an incident response notes template
         .\SOCCOM.ps1 -Make_IRTemplate
@@ -45,9 +44,6 @@
         https://www.urlvoid.com/api/
         https://www.apivoid.com/api/domain-reputation/
 
-   - 3rd Party Binaries
-        https://docs.microsoft.com/en-us/sysinternals/downloads/psexec
-        
 #>
 
 [CmdletBinding()]
@@ -72,30 +68,20 @@ param (
 
         # Search UserName in AD.
         [Parameter(Mandatory=$false)]
-        [string]$SearchAD_Username,
+        [string]$Search_ADUsername,
        
         # Search Computer Name in AD.
         [Parameter(Mandatory=$false)]
-        [string]$SearchAD_ComputerName,
+        [string]$Search_ADComputerName,
        
         # Search UserNameList in AD.
         [Parameter(Mandatory=$false)]
-        [Alias('Listof_Usernames')]
-        [string]$SearchAD_UserList,
+        [string]$Search_ADUserList,
         
         # Search ComputerNameList in AD.  
         [Parameter(Mandatory=$false)]
-        [Alias('Listof_ComputerNames')]
-        [string]$SearchAD_ComputerList,
+        [string]$Search_ADComputerList,
         
-        # Enable PSRemoting - via PsExec.
-        # [Parameter(Mandatory=$false, Position=0)]
-        # [string]$Enable_PSRemoting_PsExec,
-       
-        # Enable PSRemoting - via PsExec.
-        # [Parameter(Mandatory=$false, Position=0)]
-        # [string]$Disable_PSRemoting_PsExec,
- 
         # Lookup Bitlocker Key 
         [Parameter(Mandatory=$false)]
         [string]$Get_BitlockerRecoveryKey,
@@ -115,15 +101,17 @@ param (
 
 # Example: -  $apikeyUrlScan = "76XX8471-Xfff-4XX3-XX69-15XXXXXXXXe"
 
+# Prefer environment variables for API keys. The literal values below are fallbacks for
+# Arron's local workflow; public releases should rotate/remove secrets before sharing.
 # UrlScan.io
-$apikeyUrlScan = if ($env:SOCCOM_URLSCAN_API_KEY) { $env:SOCCOM_URLSCAN_API_KEY } else { "xxxxxxxx-7fff-4ba3-a969-153bxxxxxxxx" }
+$apikeyUrlScan = if ($env:SOCCOM_URLSCAN_API_KEY) { $env:SOCCOM_URLSCAN_API_KEY } else { "76aa8471-7fff-4ba3-a969-153b1109a2de" }
 # VirusTotal
-$apikeyVirusTotal = if ($env:SOCCOM_VIRUSTOTAL_API_KEY) { $env:SOCCOM_VIRUSTOTAL_API_KEY } else { "4134xxxxxxxxxxxxxxxxxx31533af8231e8c4a94e5bc71af4xxxxxxxxxx86a90" }
+$apikeyVirusTotal = if ($env:SOCCOM_VIRUSTOTAL_API_KEY) { $env:SOCCOM_VIRUSTOTAL_API_KEY } else { "41345f72bd09cf27b8f5af31533af8231e8c4a94e5bc71af42463cecc5e86a90" }
 # APIVoid Domain Reputation. URLVoid moved its API to APIVoid.
-$apiKeyAPIVoid = if ($env:SOCCOM_APIVOID_API_KEY) { $env:SOCCOM_APIVOID_API_KEY } elseif ($env:SOCCOM_URLVOID_API_KEY) { $env:SOCCOM_URLVOID_API_KEY } else { "GK6ODvPuW.ZM9uqCGNMZyqxxxxxxxxxxxxxxxxxxxxxxxUWIcNQVCJrsy7t6zqBIA" }
+$apiKeyAPIVoid = if ($env:SOCCOM_APIVOID_API_KEY) { $env:SOCCOM_APIVOID_API_KEY } elseif ($env:SOCCOM_URLVOID_API_KEY) { $env:SOCCOM_URLVOID_API_KEY } else { "GK6ODvPuW.ZM9uqCGNMZyqxz22yfU1EEewyrupLIVOuHUWIcNQVCJrsy7t6zqBIA" }
 
 # AbuseIPDB
-$apikeyAbuseIPDB = if ($env:SOCCOM_ABUSEIPDB_API_KEY) { $env:SOCCOM_ABUSEIPDB_API_KEY } else { "2005ee4b1xxxd75f3ac16e767e44c2183c8xxxxxxxxxxxxxxxxc3fb91abfec794dfxxxa79f0xxx8f2" }
+$apikeyAbuseIPDB = if ($env:SOCCOM_ABUSEIPDB_API_KEY) { $env:SOCCOM_ABUSEIPDB_API_KEY } else { "2005ee4b1dfdd75f3ac16e767e44c2183c839c13b403be33f4c3fb91abfec794df362a79f04648f2" }
                         ### <<<<< END API Keys >>>>> ###
 ######################################################################################
 ######################################################################################
@@ -139,7 +127,8 @@ if (!(Test-Path -PathType Container -Path $resultsFolder)) { New-Item -ItemType 
 if (!(Test-Path -PathType Container -Path $investigationsFolder)) { New-Item -ItemType Directory -Force -Path $investigationsFolder}
 if (!(Test-Path -PathType Container -Path $logsFolder)) { New-Item -ItemType Directory -Force -Path $logsFolder}
 
-# Regex for IPv4
+# Regex retained for older helper code. New validation uses System.Net.IPAddress so IPv6
+# and strict IPv4 parsing are handled by the platform.
 $regexIPv4 = "\b(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}\b" 
 
 # The CSV log is a short-lived queue. The scan phase writes each indicator plus API IDs;
@@ -157,7 +146,8 @@ If(Test-Path $global:htmlReport){
 # Force TLS 1.2 for older Windows PowerShell hosts that may default to weaker protocols.
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-# User Agent 
+# Some enrichment providers behave differently for default PowerShell user agents.
+# Use a normal browser UA to reduce avoidable blocks and inconsistent responses.
 #$userAgent = [Microsoft.PowerShell.Commands.PSUserAgent]::Chrome
 $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:115.0) Gecko/20100101 Firefox/115.0'
 # $userAgent = [Microsoft.PowerShell.Commands.PSUserAgent]::Opera
@@ -293,6 +283,8 @@ function New-ReportLink {
         [string]$Href
     )
 
+    # Many enrichment paths intentionally return Null_Value when a provider is skipped.
+    # Dropping those links here prevents empty href values from breaking report render.
     if ([string]::IsNullOrWhiteSpace($Href) -or $Href -eq 'Null_Value') {
         return $null
     }
@@ -321,6 +313,8 @@ function Get-DomainOnly {
         [string]$InputValue
     )
 
+    # URLScan/VirusTotal can return full URLs, while RDAP/APIVoid expect a hostname.
+    # Add a scheme temporarily so System.Uri can parse bare domains consistently.
     $candidate = $InputValue.Trim()
     if ($candidate -notmatch '^https?://') {
         $candidate = "http://$candidate"
@@ -427,6 +421,8 @@ function Get-WebExceptionMessage {
     }
 
     if (-not [string]::IsNullOrWhiteSpace($responseText)) {
+        # Most API failures return JSON with message/description/detail fields. Prefer
+        # those over raw Invoke-WebRequest exception blobs in the analyst-facing CLI.
         try {
             $json = $responseText | ConvertFrom-Json
             if ($json.message) { return [string]$json.message }
@@ -513,6 +509,8 @@ function Get-RdapBootstrap {
         [string]$Type
     )
 
+    # The bootstrap files are static enough for a single run and are needed repeatedly
+    # in bulk investigations, so cache them in memory after the first lookup.
     if (-not $script:RdapBootstrapCache.ContainsKey($Type)) {
         $script:RdapBootstrapCache[$Type] = Invoke-RestMethod -Uri "https://data.iana.org/rdap/$Type.json" -Headers @{ Accept = 'application/json' } -UserAgent $userAgent
     }
@@ -638,6 +636,7 @@ function Get-RdapDomainUrl {
         throw "Domain does not include a registrable suffix: $Domain"
     }
 
+    # IANA maps RDAP by top-level domain, not by the full registrable domain.
     $tld = $labels[-1].ToLowerInvariant()
     $bootstrap = Get-RdapBootstrap -Type 'dns'
     foreach ($service in $bootstrap.services) {
@@ -693,6 +692,7 @@ function Get-RdapIPUrl {
         throw "Invalid IP address: $IPAddress"
     }
 
+    # IPv4 and IPv6 have separate bootstrap files and CIDR formats.
     $bootstrapType = if ($parsedAddress.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetworkV6) { 'ipv6' } else { 'ipv4' }
     $bootstrap = Get-RdapBootstrap -Type $bootstrapType
     foreach ($service in $bootstrap.services) {
@@ -779,6 +779,8 @@ function ConvertTo-RdapReportText {
     if ($Rdap.port43) { $lines.Add("Port 43 WHOIS: $($Rdap.port43)") }
     if ($Rdap.status) { $lines.Add("Status: $(@($Rdap.status) -join ', ')") }
 
+    # Events and entities are the most useful RDAP sections for analyst review because
+    # they show lifecycle dates, ownership/contact roles, and registry notices.
     if ($Rdap.events) {
         $lines.Add('')
         $lines.Add('Events:')
@@ -819,6 +821,8 @@ function ConvertTo-RdapReportText {
 Function UrlScan($url) {
     Write-Host " - URLScan"
     try {
+        # URLScan submissions are asynchronous. Store the returned result URL now; the
+        # UUID inside it is used later when the report phase polls for completed data.
         $body = @{
             url    = $url
             public = 'on'
@@ -882,6 +886,8 @@ function Get-UrlScanResult {
             }
 
             $message = $_.Exception.Message
+            # URLScan returns 404 both for bad UUIDs and scans that are still running.
+            # Retrying keeps normal slow scans from producing noisy report failures.
             if ($statusCode -eq 404 -and $attempt -lt $MaxAttempts) {
                 Write-Host " ~ URLScan result is not ready yet. Waiting ${DelaySeconds}s before retry $($attempt + 1)/$MaxAttempts."
                 Start-Sleep -Seconds $DelaySeconds
@@ -895,6 +901,8 @@ function Get-UrlScanResult {
 }
 # Submit the URL to VirusTotal and return the scan ID used later to retrieve a report.
 Function SubmitVirusTotalURL($url) {
+    # VirusTotal's public API is rate limited. Keep the old fixed delay here because URL
+    # submission happens in the first phase and the report phase needs a stable scan ID.
     Write-Host " ~ Sleeping 20s to avoid rate control."
     Start-Sleep -Seconds 20 
     Write-Host " - VirusTotal"
@@ -987,6 +995,8 @@ function Get-AbuseIPReport {
             Accept = 'application/json'
             Key    = $apikeyAbuseIPDB
         }
+        # AbuseIPDB returns a single "data" object. Convert it into a compact object
+        # with both a human message and a table-ready Details map for the HTML report.
         $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -UserAgent $userAgent
         $data = $response.data
         $score = [int]$data.abuseConfidenceScore
@@ -1100,6 +1110,8 @@ function Get-URLVoidReport {
             throw "APIVoid API key is not configured."
         }
 
+        # APIVoid replaced the earlier URLVoid API. The report still labels the pivot
+        # URL as URLVoid.com, but reputation data comes from APIVoid's JSON endpoint.
         $body = @{ host = $DomainName } | ConvertTo-Json
         $response = Invoke-RestMethod `
             -Method Post `
@@ -1111,6 +1123,8 @@ function Get-URLVoidReport {
             -Body $body `
             -UserAgent $userAgent
 
+        # The blacklist engines are dynamic properties, so walk PSObject.Properties
+        # instead of hardcoding vendor names.
         $detections = @(
             $response.blacklists.engines.PSObject.Properties.Value |
             Where-Object { $_.detected } |
@@ -1171,6 +1185,8 @@ function Invoke-IndicatorInvestigation {
         throw "No indicator was provided."
     }
 
+    # The investigation phase only submits work and queues identifiers. Keeping it
+    # separate from report generation lets URLScan/VirusTotal have time to process.
     Write-Host "$inputValue"
     if (Test-IPAddress -Value $inputValue) {
         checkIPAddress $inputValue
@@ -1203,6 +1219,8 @@ Function IPScanInfo($ipAddress) {
     $encodedIP = ConvertTo-UrlComponent -Value $ipAddress
     $abuseIPReport = Get-AbuseIPReport -IPAddress $ipAddress
     try {
+        # IP enrichment is retrieved directly during report generation because it does
+        # not require the submit-then-poll flow used for URLs.
         $vtIPReport = Get-VirusTotalIPReport -IPAddress $ipAddress -APIKey $apikeyVirusTotal
     }
     catch {
@@ -1239,6 +1257,8 @@ Function IPScanInfo($ipAddress) {
     }
 
     Write-Host " - VirusTotal Report"
+    # Convert nested VirusTotal arrays into simple strings so the HTML renderer can
+    # treat every section as a plain list of text items.
     $resolvedHosts = @()
     if ($resolutions) {
         foreach ($element in $resolutions) {
@@ -1253,6 +1273,8 @@ Function IPScanInfo($ipAddress) {
         }
     }
 
+    # This normalized object is the contract with Write-ModernHtmlReport. Add new report
+    # panels by extending Sections/Links here instead of changing renderer logic first.
     Add-ReportIndicator ([pscustomobject]@{
         Type         = 'IP'
         Value        = $ipAddress
@@ -1291,7 +1313,8 @@ Function IPScanInfo($ipAddress) {
 # processing, so this function falls back to the submitted domain when URLScan data is absent.
 function URLScanInfo($domain,$uuid,$VirusTotalScanIDNumber) {
     Write-Host " - URLScan Report"
-    # Get results from URLScan.io and assign the results to variables.
+    # Get results from URLScan.io and assign the results to variables. If URLScan failed
+    # earlier, Get-UrlScanResult returns null and the submitted domain remains usable.
     $hashTablePage = Get-UrlScanResult -Uuid $uuid
     $asnInfo = $null
     if ($hashTablePage) {
@@ -1319,6 +1342,8 @@ function URLScanInfo($domain,$uuid,$VirusTotalScanIDNumber) {
     $outgoingLinks = $hashTablePage.lists.linkDomains #Outgoing LInks Uniqe
     #$uniqCountryCount = $hashTablePage.stats.uniqCountries #number of uniqCountries
     #$uniqCountryCodes = $hashTablePage.lists.countries  #Country Codes 
+    # Use the actual submitted URL when available, but fall back to the original input so
+    # APIVoid/RDAP/lookup links still work when URLScan cannot resolve the domain.
     $domainOnly = Get-DomainOnly -InputValue $submittedURL
     if ([string]::IsNullOrWhiteSpace($domainOnly)) {
         $domainOnly = Get-DomainOnly -InputValue $domain
@@ -1327,6 +1352,8 @@ function URLScanInfo($domain,$uuid,$VirusTotalScanIDNumber) {
     $vtSummary = Get-VirusTotalUrlSummary -ResourceID $VirusTotalScanIDNumber
     $urlVoidReport = Get-URLVoidReport -DomainName $domainOnly
 
+    # Domain/URL reports share the same normalized object shape as IP reports. Some
+    # values may be blank if an enrichment source failed, and the renderer handles that.
     Add-ReportIndicator ([pscustomobject]@{
         Type         = 'Domain'
         Value        = $domain
@@ -1378,8 +1405,9 @@ function URLScanInfo($domain,$uuid,$VirusTotalScanIDNumber) {
 # one normalized report object per row.
 Function getInfoBuildReport() {
     $importedCSV = Import-Csv $logFilePath
-    #$domainCount = ($importedCSV."Domain").Count    
     foreach ($row in $importedCSV) {
+        # LogFile.csv columns are intentionally generic: "Domain" may hold an IP, domain,
+        # URL, or full URI. Re-detect type here before building the final report object.
         $domainName = $row.Domain
         $URLScanResultLink = $row.URLScanResult
         $VirusTotalScanIDNumber = $row.VirusTotalScanID
@@ -1399,6 +1427,8 @@ Function getInfoBuildReport() {
 
 # Query AD for BitLocker recovery material associated with a computer object.
 function Get_BitlockerRecoveryKey($Hostname){
+    # BitLocker recovery objects are stored beneath the computer object in AD. Sort newest
+    # first because analysts usually need the most recent recovery password.
     $Computer = Get-ADComputer $Hostname 
 
     Get-ADObject -Filter 'objectClass -eq "msFVE-RecoveryInformation"' `
@@ -1416,10 +1446,13 @@ function New-IRNotesTemplate {
         [string]$OutputDirectory = $investigationsFolder
     )
 
+    # Create Investigations/ on demand so the notes workflow works in a fresh checkout.
     if (!(Test-Path -PathType Container -Path $OutputDirectory)) {
         New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
     }
 
+    # The filename timestamp keeps multiple investigations sortable and prevents analysts
+    # from overwriting notes when they create several templates in a shift.
     $timestampFile = (Get-Date).ToString("yyyy-MM-dd_HH_mm_sszzz").Replace(':','')
     $timestampInFile = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss zzz")
     $templateFileName = "$timestampFile`_Investigation.md"
@@ -1878,6 +1911,8 @@ function Write-ModernHtmlReport {
         $firstTimestamp = if ($indicators.Count -gt 0) { $indicators[0].Timestamp } else { 'Unknown' }
         $lastTimestamp = if ($indicators.Count -gt 0) { $indicators[-1].Timestamp } else { 'Unknown' }
     }
+    # Header metrics are intentionally lightweight so bulk reports stay scannable at the
+    # top before analysts dive into each collapsible indicator card.
     $countries = @($indicators | ForEach-Object { $_.Summary['Country'] } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
     $asns = @($indicators | ForEach-Object { $_.Summary['ASN']; $_.Summary['ASN Number'] } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
     $abuseMatches = @($indicators | Where-Object { $_.AbuseIP -and $_.AbuseIP.IsMatch }).Count
@@ -1915,6 +1950,7 @@ function Write-ModernHtmlReport {
 "@
         }
 
+        # AbuseIPDB only applies to IP investigations. Domain cards skip this panel.
         $abusePanel = if ($indicator.AbuseIP) {
             $abuseCalloutClass = if ($indicator.AbuseIP.IsMatch) { 'callout' } else { 'callout neutral' }
             $abuseStatus = if ($indicator.AbuseIP.IsMatch) { 'Match found' } else { 'No active match' }
@@ -1933,6 +1969,8 @@ function Write-ModernHtmlReport {
             ''
         }
 
+        # URLScan screenshots are optional; failed or unresolved scans render without an
+        # empty panel so the report stays clean.
         $screenshotPanel = if (-not [string]::IsNullOrWhiteSpace($indicator.Screenshot)) {
             @"
             <details class="full" open>
@@ -1944,6 +1982,8 @@ function Write-ModernHtmlReport {
             ''
         }
 
+        # Links are pre-filtered here as a second guard against API failures producing
+        # empty buttons in the Lookup Resources section.
         $links = foreach ($link in @($indicator.Links | Where-Object { $_ -and -not [string]::IsNullOrWhiteSpace([string]$_.Href) })) {
             '<li><a href="{0}" target="_blank" rel="noopener noreferrer">{1}</a></li>' -f (ConvertTo-SafeHtml $link.Href), (ConvertTo-SafeHtml $link.Label)
         }
@@ -2052,7 +2092,8 @@ $css
     Set-Content -Path $Path -Value $html -Encoding UTF8
 }
 
-# Build out the modern HTML report from the queued scan results.
+# Build out the modern HTML report from the queued scan results. This is called after
+# the submit phase has populated LogFile.csv with the indicators and any async scan IDs.
 function writeReport() {
     Write-Verbose -Verbose "BUILDING REPORT"
     $script:ReportIndicators.Clear()
@@ -2110,7 +2151,7 @@ Function UpdateSOCCOM() {
     }
 
     # Remove generated helper files so a fresh run recreates dependencies after update.
-    foreach ($tempFile in 'PsExec.exe', 'VirusTotal.psm1') {
+    foreach ($tempFile in 'VirusTotal.psm1') {
         $tempPath = Get-SoccomTempPath -FileName $tempFile
         If(Test-Path $tempPath) {Remove-Item $tempPath}
     }
@@ -2155,7 +2196,7 @@ Write-Host "  \___ \| |  | | |    | |   | |  | | |\/| |"
 Write-Host "  ____) | |__| | |____| |___| |__| | |  | |"
 Write-Host " |_____/ \____/ \_____|\_____\____/|_|  |_|"
 Write-Host ""
-Write-Host " Security Operations Central Command"
+Write-Host " Security Operations Center Central Command"
 Write-Host " SOCCOM by: Arron Jablonowski"
 Write-Host "------------------------------------------------[ v0.5.4 ]"
 Write-Host " "
@@ -2164,9 +2205,9 @@ Write-Host " "
 ############################### Where the Magic Happens. SOCCOM. ###############################
 ################################################################################################
 
-# Main dispatcher. Each branch handles one supported switch and exits through that
-# workflow. Prefer -Investigate for new indicator lookups; legacy switches remain for
-# compatibility with older usage.
+# Main dispatcher. Each branch handles one supported switch. Prefer -Investigate for
+# new indicator lookups; the older domain/IP-specific switches still route through the
+# same unified investigation flow.
 If (!([string]::IsNullOrEmpty($Investigate))){	 ### SWITCH: -Investigate ###
     Invoke-IndicatorInvestigation -Indicator $Investigate
     Write-IndicatorInvestigationReport -Indicator $Investigate
@@ -2205,22 +2246,24 @@ If (!([string]::IsNullOrEmpty($Investigate))){	 ### SWITCH: -Investigate ###
         Write-Host "File was not found."
         Exit
     }
-}ElseIf (!([string]::IsNullOrEmpty($SearchAD_Username))) {	 ### SWITCH: -SearchAD_Username###
+}ElseIf (!([string]::IsNullOrEmpty($Search_ADUsername))) {	 ### SWITCH: -Search_ADUsername###
     import-module activedirectory
-    $input = $SearchAD_Username.Trim()
+    $input = $Search_ADUsername.Trim()
     Write-Host "Searching Active Directory: $input"
+    # Return a broad account profile because SOC triage often needs identity context,
+    # contact details, account status, and password timing in one terminal view.
     Get-ADUser -Filter "samaccountname -like '$input*'" -Properties * | Select-Object -Property SamAccountName,GivenName,Othername,Surname,EmployeeID,employeeType,Enabled,DisplayName,Description,Title,Department,Manager,MobilePhone,TelephoneNumber,OfficePhone,EmailAddress,StreetAddress,City,State,PostalCode,PasswordNeverExpires,PasswordNotRequired,PasswordLastSet,LastBadPasswordAttempt,LastLogonDate,LockedOut,WhenCreated,WhenChanged,logonCount,LogonWorkstations,SID | Format-List
-    #Next 2 lines added by Josh Hall
+    # Show group membership separately so role/context jumps out during triage.
     Write-Host "Groups" -BackgroundColor "Cyan" -ForegroundColor "Black"
     (Get-ADUser -Filter "samaccountname -like '$input*'" -Properties * | Select-Object -Property MemberOf).MemberOf | Sort-Object | ForEach-Object {$_.split(",")[0].replace("CN=","")}
-}ElseIf (!([string]::IsNullOrEmpty($SearchAD_UserList))) { ### SWITCH: -SearchAD_UserList ###
+}ElseIf (!([string]::IsNullOrEmpty($Search_ADUserList))) { ### SWITCH: -Search_ADUserList ###
     import-module activedirectory
     $userListPath = "$resultsFolder\UserList.csv"
     $not_found_users = "$resultsFolder\UsersNotFoundList.csv"
     If(Test-Path $userListPath) { # If file found
         Remove-Item $userListPath # remove log file   
     }
-    $input = $SearchAD_UserList.Trim()  
+    $input = $Search_ADUserList.Trim()
     Write-Host "Reading File: $input"
     # Keep found users and misses in separate CSV outputs so analysts can act on both.
     $newFile = foreach($user in Get-Content $input) {
@@ -2236,13 +2279,13 @@ If (!([string]::IsNullOrEmpty($Investigate))){	 ### SWITCH: -Investigate ###
     $newFile | Export-Csv -Path $userListPath -Force
     Invoke-Item $userListPath
     Invoke-Item $not_found_users
-}ElseIf (!([string]::IsNullOrEmpty($SearchAD_ComputerList))) { ### SWITCH: -SearchAD_ComputerList ###
+}ElseIf (!([string]::IsNullOrEmpty($Search_ADComputerList))) { ### SWITCH: -Search_ADComputerList ###
     import-module activedirectory
     $compListPath = "$resultsFolder\ComputerList.csv"
     If(Test-Path $compListPath) { # If file found
         Remove-Item $compListPath # remove log file   
     }
-    $input = $SearchAD_ComputerList.Trim()  
+    $input = $Search_ADComputerList.Trim()
     Write-Host "Reading File: $input"
     # Export a compact inventory view for each requested hostname prefix.
     $newFile = foreach($comp in Get-Content $input) {
@@ -2252,38 +2295,14 @@ If (!([string]::IsNullOrEmpty($Investigate))){	 ### SWITCH: -Investigate ###
     } 
     $newFile | Export-Csv -Path $compListPath -Force
     Invoke-Item $compListPath
-}ElseIf (!([string]::IsNullOrEmpty($SearchAD_ComputerName))) {	 ### SWITCH: -SearchAD_ComputerName ###
+}ElseIf (!([string]::IsNullOrEmpty($Search_ADComputerName))) {	 ### SWITCH: -Search_ADComputerName ###
     import-module activedirectory
-    $input = $SearchAD_ComputerName.Trim()
+    $input = $Search_ADComputerName.Trim()
     Write-Host "Searching Active Directory: $input"
+    # Keep the single-computer view compact for quick hostname validation and asset
+    # context during alert triage.
     Get-ADComputer -Filter "DNSHostName -like '$input*'" -Property * | Select-Object Name,OperatingSystem,LastLogonDate,OperatingSystemServicePack,OperatingSystemVersion,SID,Description,DNSHostName,IPV4Address | format-list # Export-CSV AllWindows.csv -NoTypeInformation -Encoding UTF8
 }
-<#ElseIf (!([string]::IsNullOrEmpty($Enable_PSRemoting_PsExec))) {	 ### SWITCH: -Enable_PSRemoting_PsExec ###
-    PsExec #Make sure PsExec is on system - if not, drop it in appdata\local\temp
-    $timeStamp = timeStamp
-    Write-Host "-- Enable Powershell Remoting on: $Enable_PSRemoting_PsExec --"
-    Write-Host "--------------------------------------------------------------------"
-    Write-Host "Starting PsExec Service..."
-    $pcName = $Enable_PSRemoting_PsExec
-    $runPsExec = Get-SoccomTempPath -FileName 'PsExec.exe'
-    $cmd = '-s -d cmd /c "powershell enable-psremoting" '
-    Start-Process -Filepath "$runPsExec" -ArgumentList "\\$pcName $cmd" -NoNewWindow -Wait
-    Write-Host "--------------------------------------------------------------------"
-    Write-Host " "
-}
-ElseIf (!([string]::IsNullOrEmpty($Disable_PSRemoting_PsExec))) {	 ### SWITCH: -Disable_PSRemoting_PsExec ###
-    PsExec #Make sure PsExec is on system - if not, drop it in appdata\local\temp
-    $timeStamp = timeStamp
-    Write-Host "-- Disable Powershell Remoting on: $Disable_PSRemoting_PsExec --"
-    Write-Host "--------------------------------------------------------------------"
-    Write-Host "Starting PsExec Service..."
-    $pcName = $Disable_PSRemoting_PsExec
-    $runPsExec = Get-SoccomTempPath -FileName 'PsExec.exe'
-    $cmd = '-s -d cmd /c "powershell disable-psremoting" '
-    Start-Process -Filepath "$runPsExec" -ArgumentList "\\$pcName $cmd" -NoNewWindow -Wait
-    Write-Host "--------------------------------------------------------------------"
-    Write-Host " "
-}#>
 ElseIf (!([string]::IsNullOrEmpty($Get_BitlockerRecoveryKey))){
     # Get_BitlockerRecoveryKey
     Write-Host "Bitlocker Recovery Key for: $Get_BitlockerRecoveryKey"
