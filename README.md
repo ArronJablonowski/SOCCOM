@@ -85,7 +85,7 @@ The template is designed for SOC analysts working under pressure and includes:
 ## Requirements
 
 - PowerShell 7+ recommended
-- Windows PowerShell supported for multiple OS types - Tested on Windows, MacOS, & Ubuntu. 
+- PowerShell 7 runs on Windows, macOS, and Linux; Windows PowerShell 5.1 is Windows only.
 - Network access to enrichment providers
 - Active Directory PowerShell module for AD-related functions
 - Valid API keys for full enrichment coverage
@@ -94,7 +94,7 @@ Active Directory and BitLocker workflows are intended for domain-connected Windo
 
 ## API Keys
 
-SOCCOM supports API keys through environment variables. This is the recommended approach because it avoids storing secrets directly in the script.
+SOCCOM reads API keys from environment variables. Keys are not bundled with the script. Providers without a configured key are skipped; unavailable reputation results are marked as unavailable rather than zero detections.
 
 ```powershell
 $env:SOCCOM_URLSCAN_API_KEY = "your-urlscan-key"
@@ -149,14 +149,15 @@ Create a Markdown incident response notes template:
 | --- | --- |
 | `-Investigate <indicator>` | Investigate an IPv4 address, IPv6 address, domain, URL, or full URI. |
 | `-Investigate_List <path>` | Investigate a file containing mixed IPs, domains, URLs, or URIs. |
-| `-SearchAD_Username <username>` | Search Active Directory for a user and show detailed account properties and group membership. |
-| `-SearchAD_ComputerName <hostname>` | Search Active Directory for a computer. |
-| `-SearchAD_UserList <path>` | Search Active Directory for a list of users and export results to CSV. |
-| `-SearchAD_ComputerList <path>` | Search Active Directory for a list of computers and export results to CSV. |
+| `-Search_ADUsername <username>` | Search Active Directory for a user and show detailed account properties and group membership. |
+| `-Search_ADComputerName <hostname>` | Search Active Directory for a computer. |
+| `-Search_ADUserList <path>` | Search Active Directory for a list of users and export results to CSV. |
+| `-Search_ADComputerList <path>` | Search Active Directory for a list of computers and export results to CSV. |
 | `-Get_BitlockerRecoveryKey <hostname>` | Retrieve BitLocker recovery key information for a computer from Active Directory. |
+| `-SOCCOM_Update` | Update the running script from GitHub after validation, keeping a backup beside it. |
 | `-Make_IRTemplate` | Create a timestamped Markdown SOC investigation notes file. |
 
-Legacy aliases are still present for earlier function names, but new usage should prefer the command names above.
+The earlier documented `-SearchAD_Username`, `-SearchAD_ComputerName`, `-SearchAD_UserList`, and `-SearchAD_ComputerList` spellings are accepted as aliases. List files are read literally, with surrounding whitespace and blank lines ignored.
 
 ## Example Indicator List
 
@@ -209,3 +210,13 @@ The HTML report includes this reminder:
 - Example markdown IR template
   - *Pro tip: Make your Obsidian Vault point to the 'Investigations' directory*
 ![alt text](https://github.com/ArronJablonowski/SOCCOM/blob/main/img/obsidian_investigation_template.png?raw=true)
+
+## Offline Regression Checks
+
+Run from the project root:
+
+```powershell
+pwsh -NoProfile -File ./tests/Regression.Tests.ps1
+```
+
+The suite uses temporary files and mocked provider/AD calls. It does not submit indicators, use real API keys, or modify the installed script. Live provider access and domain-connected AD behavior require separate integration checks.

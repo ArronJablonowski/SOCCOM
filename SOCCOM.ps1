@@ -51,78 +51,76 @@ param (
         # IP, domain, URL, or full URI to scan.
         [Parameter(Mandatory=$false, Position=0)]
         [Alias('Indicator')]
+        [ValidatePattern('\S')]
         [string]$Investigate,
 
         # Domain to scan. Prefer -Investigate for new usage.
         [Parameter(Mandatory=$false)]
+        [ValidatePattern('\S')]
         [string]$Investigate_Domain, 
        
         # IP to scan. Prefer -Investigate for new usage.
         [Parameter(Mandatory=$false)]
+        [ValidatePattern('\S')]
         [string]$Investigate_IPAddress,
        
         # List of Domains/IPs to scan.
         [Parameter(Mandatory=$false)]
         [Alias('Listof_DomainsAndIPs')]
+        [ValidatePattern('\S')]
         [string]$Investigate_List,
 
         # Search UserName in AD.
         [Parameter(Mandatory=$false)]
+        [Alias('SearchAD_Username')]
+        [ValidatePattern('\S')]
         [string]$Search_ADUsername,
        
         # Search Computer Name in AD.
         [Parameter(Mandatory=$false)]
+        [Alias('SearchAD_ComputerName')]
+        [ValidatePattern('\S')]
         [string]$Search_ADComputerName,
        
         # Search UserNameList in AD.
         [Parameter(Mandatory=$false)]
+        [Alias('SearchAD_UserList')]
+        [ValidatePattern('\S')]
         [string]$Search_ADUserList,
         
         # Search ComputerNameList in AD.  
         [Parameter(Mandatory=$false)]
+        [Alias('SearchAD_ComputerList')]
+        [ValidatePattern('\S')]
         [string]$Search_ADComputerList,
         
         # Lookup Bitlocker Key 
         [Parameter(Mandatory=$false)]
+        [ValidatePattern('\S')]
         [string]$Get_BitlockerRecoveryKey,
 
         # Create an incident response notes template.
         [Alias('New_IRNotesTemplate')]
-        [switch]$Make_IRTemplate
+        [switch]$Make_IRTemplate,
         
         # Update SOCCOM 
-        # [switch]$SOCCOM_Update 
+        [switch]$SOCCOM_Update
 )
 
 ######################################################################################
 ######################################################################################
-                        ## !! ONLY MODIFY API KEYS !! ##
-                        ### <<< API KEYS GO HERE >>> ###
-
-# Example: -  $apikeyUrlScan = "76XX8471-Xfff-4XX3-XX69-15XXXXXXXXe"
-
-# Prefer environment variables for API keys. The literal values below are fallbacks for
-# Arron's local workflow; public releases should rotate/remove secrets before sharing.
-# UrlScan.io
-$apikeyUrlScan = if ($env:SOCCOM_URLSCAN_API_KEY) { $env:SOCCOM_URLSCAN_API_KEY } else { "76aa8471-7fff-4ba3-a969-153b1109a2de" }
-# VirusTotal
-$apikeyVirusTotal = if ($env:SOCCOM_VIRUSTOTAL_API_KEY) { $env:SOCCOM_VIRUSTOTAL_API_KEY } else { "41345f72bd09cf27b8f5af31533af8231e8c4a94e5bc71af42463cecc5e86a90" }
-# APIVoid Domain Reputation. URLVoid moved its API to APIVoid.
-$apiKeyAPIVoid = if ($env:SOCCOM_APIVOID_API_KEY) { $env:SOCCOM_APIVOID_API_KEY } elseif ($env:SOCCOM_URLVOID_API_KEY) { $env:SOCCOM_URLVOID_API_KEY } else { "GK6ODvPuW.ZM9uqCGNMZyqxz22yfU1EEewyrupLIVOuHUWIcNQVCJrsy7t6zqBIA" }
-
-# AbuseIPDB
-$apikeyAbuseIPDB = if ($env:SOCCOM_ABUSEIPDB_API_KEY) { $env:SOCCOM_ABUSEIPDB_API_KEY } else { "2005ee4b1dfdd75f3ac16e767e44c2183c839c13b403be33f4c3fb91abfec794df362a79f04648f2" }
-                        ### <<<<< END API Keys >>>>> ###
-######################################################################################
-######################################################################################
-
+# API keys are supplied by the caller's environment; never embed shared credentials.
+$apikeyUrlScan = $env:SOCCOM_URLSCAN_API_KEY
+$apikeyVirusTotal = $env:SOCCOM_VIRUSTOTAL_API_KEY
+$apiKeyAPIVoid = if ($env:SOCCOM_APIVOID_API_KEY) { $env:SOCCOM_APIVOID_API_KEY } else { $env:SOCCOM_URLVOID_API_KEY }
+$apikeyAbuseIPDB = $env:SOCCOM_ABUSEIPDB_API_KEY
 
 # Folder layout used by the script. Results are HTML reports, Investigations are Markdown
 # case notes, and Logs are transient CSV files used between the submit and report phases.
 $resultsFolder = ".\Results"
 $investigationsFolder = ".\Investigations"
 $logsFolder = ".\Logs"
-$script:TempFolder = [System.IO.Path]::GetTempPath()
+$script:SoccomScriptPath = $PSCommandPath
 if (!(Test-Path -PathType Container -Path $resultsFolder)) { New-Item -ItemType Directory -Force -Path $resultsFolder}
 if (!(Test-Path -PathType Container -Path $investigationsFolder)) { New-Item -ItemType Directory -Force -Path $investigationsFolder}
 if (!(Test-Path -PathType Container -Path $logsFolder)) { New-Item -ItemType Directory -Force -Path $logsFolder}
@@ -133,15 +131,9 @@ $regexIPv4 = "\b(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9
 
 # The CSV log is a short-lived queue. The scan phase writes each indicator plus API IDs;
 # the report phase reads it back to assemble one consolidated HTML report.
-$logFilePath = '.\Logs\LogFile.csv' # Used to hold results
-If(Test-Path $logFilePath){
-    Remove-Item $logFilePath # if the file exists, remove it.
-}
-
-$global:htmlReport = '.\Results\Report.html' # Used to hold the path to the Report  
-If(Test-Path $global:htmlReport){
-    Remove-Item $global:htmlReport # if the file exists, remove it. 
-}
+$runId = [guid]::NewGuid().ToString('N')
+$logFilePath = Join-Path $logsFolder "LogFile_$runId.csv"
+$global:htmlReport = Join-Path $resultsFolder "Report_$runId.html"
 
 # Force TLS 1.2 for older Windows PowerShell hosts that may default to weaker protocols.
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -206,7 +198,11 @@ function ConvertTo-SafeFileName {
     $invalidCharacters = [regex]::Escape((-join ([System.IO.Path]::GetInvalidFileNameChars() + [char[]]'<>:"/\|?*')))
     $safeName = $Value -replace "[$invalidCharacters]", '_'
     $safeName = $safeName -replace '\s+', '_'
-    return $safeName.Trim('_')
+    $safeName = $safeName.Trim('_').TrimEnd('.', ' ')
+    if ([string]::IsNullOrWhiteSpace($safeName)) { $safeName = 'investigation' }
+    # Windows reserves these device names, including when followed by an extension.
+    if ($safeName -match '^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)') { $safeName = "_$safeName" }
+    return $safeName
 }
 
 # Choose the report filename base from the user's original input. Full URLs are analyzed
@@ -245,8 +241,8 @@ function New-TimestampedReportFileName {
         [string]$BaseName
     )
 
-    $timestamp = (Get-Date).ToString('yyyyMMdd_HHmmss')
-    return "{0}_{1}.html" -f $BaseName, $timestamp
+    $timestamp = (Get-Date).ToString('yyyyMMdd_HHmmss_fff')
+    return "{0}_{1}_{2}.html" -f $BaseName, $timestamp, ([guid]::NewGuid().ToString('N'))
 }
 
 function ConvertTo-UrlComponent {
@@ -269,8 +265,27 @@ function Test-IPAddress {
         return $false
     }
 
+    $text = $Value.Trim()
     $parsedAddress = $null
-    return [System.Net.IPAddress]::TryParse($Value.Trim(), [ref]$parsedAddress)
+    if (-not [System.Net.IPAddress]::TryParse($text, [ref]$parsedAddress)) { return $false }
+    # TryParse also accepts integers, hex, octal, and abbreviated IPv4 addresses.
+    # Those forms must not silently route a hostname into the IP lookup path.
+    if ($parsedAddress.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork) {
+        return $text -cmatch '^(0|[1-9]\d{0,2})(\.(0|[1-9]\d{0,2})){3}$'
+    }
+    return $true
+}
+
+# Attribute escaping does not neutralize javascript: or data: URLs. Only web links
+# may be embedded in reports, including links returned by enrichment providers.
+function ConvertTo-SafeReportUrl {
+    param([AllowNull()][string]$Value)
+    $uri = $null
+    if ([System.Uri]::TryCreate($Value, [System.UriKind]::Absolute, [ref]$uri) -and
+        $uri.Scheme -in @('http', 'https') -and -not [string]::IsNullOrWhiteSpace($uri.Host)) {
+        return $uri.AbsoluteUri
+    }
+    return ''
 }
 
 # Small value object used by the HTML report renderer for Lookup Resources buttons.
@@ -285,7 +300,8 @@ function New-ReportLink {
 
     # Many enrichment paths intentionally return Null_Value when a provider is skipped.
     # Dropping those links here prevents empty href values from breaking report render.
-    if ([string]::IsNullOrWhiteSpace($Href) -or $Href -eq 'Null_Value') {
+    $Href = ConvertTo-SafeReportUrl $Href
+    if ([string]::IsNullOrWhiteSpace($Href)) {
         return $null
     }
 
@@ -316,16 +332,16 @@ function Get-DomainOnly {
     # URLScan/VirusTotal can return full URLs, while RDAP/APIVoid expect a hostname.
     # Add a scheme temporarily so System.Uri can parse bare domains consistently.
     $candidate = $InputValue.Trim()
-    if ($candidate -notmatch '^https?://') {
+    if ($candidate -notmatch '^[a-z][a-z0-9+.-]*://') {
         $candidate = "http://$candidate"
     }
 
     try {
         $uri = [System.Uri]$candidate
-        return ($uri.Host -replace '^www\.', '')
+        return $uri.IdnHost.TrimEnd('.')
     }
     catch {
-        return (($InputValue -replace '^https?://', '') -replace '^www\.', '').Split('/')[0]
+        return ''
     }
 }
 
@@ -486,16 +502,6 @@ function Get-HtmlClassText {
     }
 
     return ConvertFrom-HtmlFragment -Html $matches[$matches.Count - 1].Groups['content'].Value
-}
-
-# Keep embedded helper files in the OS temp directory instead of the repo/workspace.
-function Get-SoccomTempPath {
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$FileName
-    )
-
-    return (Join-Path -Path $script:TempFolder -ChildPath $FileName)
 }
 
 $script:RdapBootstrapCache = @{}
@@ -821,6 +827,7 @@ function ConvertTo-RdapReportText {
 Function UrlScan($url) {
     Write-Host " - URLScan"
     try {
+        if ([string]::IsNullOrWhiteSpace($apikeyUrlScan)) { throw 'URLScan API key is not configured.' }
         # URLScan submissions are asynchronous. Store the returned result URL now; the
         # UUID inside it is used later when the report phase polls for completed data.
         $body = @{
@@ -901,13 +908,17 @@ function Get-UrlScanResult {
 }
 # Submit the URL to VirusTotal and return the scan ID used later to retrieve a report.
 Function SubmitVirusTotalURL($url) {
+    if ([string]::IsNullOrWhiteSpace($apikeyVirusTotal)) {
+        Write-Host ' ~ VirusTotal submission skipped: API key is not configured.'
+        return 'Null_Value'
+    }
     # VirusTotal's public API is rate limited. Keep the old fixed delay here because URL
     # submission happens in the first phase and the report phase needs a stable scan ID.
     Write-Host " ~ Sleeping 20s to avoid rate control."
     Start-Sleep -Seconds 20 
     Write-Host " - VirusTotal"
     try {
-        $scanReport = Submit-VirusTotalURL -URL $url -APIKey $apikeyVirusTotal
+        $scanReport = Submit-VirusTotalURL -URL $url -APIKey $apikeyVirusTotal -ErrorAction Stop
         if ($scanReport -and $scanReport.scan_id) {
             Return $scanReport.scan_id
         }
@@ -999,6 +1010,9 @@ function Get-AbuseIPReport {
         # with both a human message and a table-ready Details map for the HTML report.
         $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -UserAgent $userAgent
         $data = $response.data
+        if ($null -eq $data.abuseConfidenceScore -or $null -eq $data.totalReports) {
+            throw 'AbuseIPDB returned no reputation data.'
+        }
         $score = [int]$data.abuseConfidenceScore
         $reportCount = [int]$data.totalReports
         $isMatch = ($score -gt 0 -or $reportCount -gt 0)
@@ -1030,6 +1044,7 @@ function Get-AbuseIPReport {
 
         [pscustomobject]@{
             Message        = "$IPAddress was $status. $($details -join '; ')"
+            LookupSucceeded = $true
             IsMatch        = $isMatch
             Score          = $score
             TotalReports   = $reportCount
@@ -1041,6 +1056,7 @@ function Get-AbuseIPReport {
         Write-Warning "AbuseIPdb lookup failed for $IPAddress. $($_.Exception.Message)"
         [pscustomobject]@{
             Message        = "AbuseIPdb lookup failed or returned no result."
+            LookupSucceeded = $false
             IsMatch        = $false
             Score          = $null
             TotalReports   = $null
@@ -1072,7 +1088,11 @@ function Get-VirusTotalUrlSummary {
     }
 
     try {
-        $VTReport = Get-VirusTotalURLReport -Resource $ResourceID -APIKey $apikeyVirusTotal
+        if ([string]::IsNullOrWhiteSpace($apikeyVirusTotal)) { throw 'VirusTotal API key is not configured.' }
+        $VTReport = Get-VirusTotalURLReport -Resource $ResourceID -APIKey $apikeyVirusTotal -ErrorAction Stop
+        if ($VTReport.response_code -ne 1 -or $null -eq $VTReport.positives -or $null -eq $VTReport.total) {
+            throw 'VirusTotal report is pending or unavailable.'
+        }
     }
     catch {
         Write-Host " ~ VirusTotal report unavailable. $($_.Exception.Message)"
@@ -1123,6 +1143,8 @@ function Get-URLVoidReport {
             -Body $body `
             -UserAgent $userAgent
 
+        if ($null -eq $response.blacklists.detections) { throw 'APIVoid returned no reputation data.' }
+
         # The blacklist engines are dynamic properties, so walk PSObject.Properties
         # instead of hardcoding vendor names.
         $detections = @(
@@ -1149,7 +1171,7 @@ function Get-URLVoidReport {
     catch {
         Write-Warning "APIVoid domain reputation lookup failed for $DomainName. $($_.Exception.Message)"
         [pscustomobject]@{
-            Count              = '0'
+            Count              = 'n/a'
             Detections         = 'n/a'
             DomainRegistration = 'Unknown'
         }
@@ -1164,13 +1186,38 @@ function URLVoid($domainName) { Get-URLVoidReport -DomainName $domainName }
 Function checkDomain($domain) {
     $URLScanResultUrl = UrlScan($domain)
     $VirusTotalScanID = SubmitVirusTotalURL($domain)    
-    Add-Content -Path $logFilePath -Value "$domain,$URLScanResultUrl,$VirusTotalScanID"
+    [pscustomobject]@{
+        Domain = $domain
+        URLScanResult = $URLScanResultUrl
+        VirusTotalScanID = $VirusTotalScanID
+    } | Export-Csv -LiteralPath $logFilePath -Append -NoTypeInformation -Encoding UTF8
 }
 
 # IPs do not require URLScan/VirusTotal URL submission, so enqueue placeholders.
 Function checkIPAddress($checkIPAddress) { 
     Write-Host " - IP Logged"   
-    Add-Content -Path $logFilePath -Value "$checkIPAddress,Null_Value,Null_Value"
+    [pscustomobject]@{
+        Domain = $checkIPAddress
+        URLScanResult = 'Null_Value'
+        VirusTotalScanID = 'Null_Value'
+    } | Export-Csv -LiteralPath $logFilePath -Append -NoTypeInformation -Encoding UTF8
+}
+
+# Read list entries without expanding wildcard characters in the supplied path.
+function Get-SoccomInputList {
+    param([Parameter(Mandatory=$true)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "List file was not found: $Path" }
+    $values = @(Get-Content -LiteralPath $Path -ErrorAction Stop | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($values.Count -eq 0) { throw "List file contains no entries: $Path" }
+    return $values
+}
+
+# Escape literal values in LDAP filters while leaving intentional prefix wildcards
+# outside the value. Quotes and LDAP metacharacters in account names are then safe.
+function ConvertTo-LdapFilterValue {
+    param([Parameter(Mandatory=$true)][string]$Value)
+    return $Value.Replace('\', '\5c').Replace('*', '\2a').Replace('(', '\28').Replace(')', '\29').Replace([string][char]0, '\00')
 }
 
 # Route a user-supplied indicator into the right first-phase queue path.
@@ -1207,9 +1254,9 @@ function Write-IndicatorInvestigationReport {
     writeReport
     $reportName = Get-InvestigationReportName -Indicator $Indicator
     $newReport = "$resultsFolder\$(New-TimestampedReportFileName -BaseName $reportName)"
-    Copy-Item -Path $global:htmlReport -Destination $newReport -Force
-    Invoke-Item $newReport
-    Remove-Item $global:htmlReport
+    Copy-Item -LiteralPath $global:htmlReport -Destination $newReport -ErrorAction Stop
+    Invoke-Item -LiteralPath $newReport
+    Remove-Item -LiteralPath $global:htmlReport
 }
 
 # Build the normalized report object for an IP indicator. The HTML renderer consumes
@@ -1221,7 +1268,9 @@ Function IPScanInfo($ipAddress) {
     try {
         # IP enrichment is retrieved directly during report generation because it does
         # not require the submit-then-poll flow used for URLs.
-        $vtIPReport = Get-VirusTotalIPReport -IPAddress $ipAddress -APIKey $apikeyVirusTotal
+        if ([string]::IsNullOrWhiteSpace($apikeyVirusTotal)) { throw 'VirusTotal API key is not configured.' }
+        $vtIPReport = Get-VirusTotalIPReport -IPAddress $ipAddress -APIKey $apikeyVirusTotal -ErrorAction Stop
+        if ($vtIPReport.response_code -ne 1) { throw 'VirusTotal returned no IP report.' }
     }
     catch {
         Write-Warning "VirusTotal IP lookup failed for $ipAddress. $($_.Exception.Message)"
@@ -1404,7 +1453,7 @@ function URLScanInfo($domain,$uuid,$VirusTotalScanIDNumber) {
 # Second phase of report generation. Read queued indicators from LogFile.csv and build
 # one normalized report object per row.
 Function getInfoBuildReport() {
-    $importedCSV = Import-Csv $logFilePath
+    $importedCSV = Import-Csv -LiteralPath $logFilePath -ErrorAction Stop
     foreach ($row in $importedCSV) {
         # LogFile.csv columns are intentionally generic: "Domain" may hold an IP, domain,
         # URL, or full URI. Re-detect type here before building the final report object.
@@ -1429,11 +1478,11 @@ Function getInfoBuildReport() {
 function Get_BitlockerRecoveryKey($Hostname){
     # BitLocker recovery objects are stored beneath the computer object in AD. Sort newest
     # first because analysts usually need the most recent recovery password.
-    $Computer = Get-ADComputer $Hostname 
+    $Computer = Get-ADComputer -Identity $Hostname -ErrorAction Stop
 
     Get-ADObject -Filter 'objectClass -eq "msFVE-RecoveryInformation"' `
         -SearchBase $Computer.DistinguishedName `
-        -Properties whenCreated, msFVE-RecoveryPassword `
+        -Properties whenCreated, msFVE-RecoveryPassword -ErrorAction Stop `
         | Sort-Object whenCreated -Descending `
         | Select-Object whenCreated, @{N='PasswordID';E={$_.name.Split("{")[1].Replace("}","")}}, msFVE-RecoveryPassword `
         | Format-List
@@ -1453,9 +1502,9 @@ function New-IRNotesTemplate {
 
     # The filename timestamp keeps multiple investigations sortable and prevents analysts
     # from overwriting notes when they create several templates in a shift.
-    $timestampFile = (Get-Date).ToString("yyyy-MM-dd_HH_mm_sszzz").Replace(':','')
+    $timestampFile = (Get-Date).ToString("yyyy-MM-dd_HH_mm_ss_fffzzz").Replace(':','')
     $timestampInFile = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss zzz")
-    $templateFileName = "$timestampFile`_Investigation.md"
+    $templateFileName = "{0}_{1}_Investigation.md" -f $timestampFile, ([guid]::NewGuid().ToString('N'))
     $templatePath = Join-Path -Path $OutputDirectory -ChildPath $templateFileName
 
     $templateText = @'
@@ -1742,11 +1791,11 @@ function New-IRNotesTemplate {
 
     $lines = ($templateText -replace '__INVESTIGATION_START_TIME__', $timestampInFile) -split "`r?`n"
 
-    Set-Content -Path $templatePath -Value $lines -Encoding UTF8
+    Set-Content -LiteralPath $templatePath -Value $lines -Encoding UTF8 -ErrorAction Stop
     Write-Host ""
     Write-Host "IR notes template created: $templatePath"
     Write-Host ""
-    Invoke-Item $templatePath
+    Invoke-Item -LiteralPath $templatePath
 
     return $templatePath
 }
@@ -1953,7 +2002,7 @@ function Write-ModernHtmlReport {
         # AbuseIPDB only applies to IP investigations. Domain cards skip this panel.
         $abusePanel = if ($indicator.AbuseIP) {
             $abuseCalloutClass = if ($indicator.AbuseIP.IsMatch) { 'callout' } else { 'callout neutral' }
-            $abuseStatus = if ($indicator.AbuseIP.IsMatch) { 'Match found' } else { 'No active match' }
+            $abuseStatus = if ($indicator.AbuseIP.LookupSucceeded -eq $false) { 'Lookup unavailable' } elseif ($indicator.AbuseIP.IsMatch) { 'Match found' } else { 'No active match' }
             @"
             <details open>
               <summary><span>AbuseIPdb.com</span></summary>
@@ -1971,11 +2020,12 @@ function Write-ModernHtmlReport {
 
         # URLScan screenshots are optional; failed or unresolved scans render without an
         # empty panel so the report stays clean.
-        $screenshotPanel = if (-not [string]::IsNullOrWhiteSpace($indicator.Screenshot)) {
+        $screenshotUrl = ConvertTo-SafeReportUrl $indicator.Screenshot
+        $screenshotPanel = if (-not [string]::IsNullOrWhiteSpace($screenshotUrl)) {
             @"
             <details class="full" open>
               <summary><span>URLScan Screenshot</span></summary>
-              <a class="screenshot-link" href="$(ConvertTo-SafeHtml $indicator.Screenshot)" target="_blank" rel="noopener noreferrer"><img src="$(ConvertTo-SafeHtml $indicator.Screenshot)" alt="URLScan screenshot for $(ConvertTo-SafeHtml $indicator.Value)"></a>
+              <a class="screenshot-link" href="$(ConvertTo-SafeHtml $screenshotUrl)" target="_blank" rel="noopener noreferrer"><img src="$(ConvertTo-SafeHtml $screenshotUrl)" alt="URLScan screenshot for $(ConvertTo-SafeHtml $indicator.Value)"></a>
             </details>
 "@
         } else {
@@ -1985,7 +2035,10 @@ function Write-ModernHtmlReport {
         # Links are pre-filtered here as a second guard against API failures producing
         # empty buttons in the Lookup Resources section.
         $links = foreach ($link in @($indicator.Links | Where-Object { $_ -and -not [string]::IsNullOrWhiteSpace([string]$_.Href) })) {
-            '<li><a href="{0}" target="_blank" rel="noopener noreferrer">{1}</a></li>' -f (ConvertTo-SafeHtml $link.Href), (ConvertTo-SafeHtml $link.Label)
+            $safeHref = ConvertTo-SafeReportUrl $link.Href
+            if ($safeHref) {
+                '<li><a href="{0}" target="_blank" rel="noopener noreferrer">{1}</a></li>' -f (ConvertTo-SafeHtml $safeHref), (ConvertTo-SafeHtml $link.Label)
+            }
         }
 
         $hostCount = ($indicator.Sections | Where-Object { $_.Title -eq 'Resolved Host Names' } | ForEach-Object { Get-SectionItemCount -Items $_.Items } | Select-Object -First 1)
@@ -2002,7 +2055,7 @@ function Write-ModernHtmlReport {
           <header class="indicator-head">
             <div>
               <p class="eyebrow">Indicator $($i + 1)</p>
-              <h2 class="indicator-title"><a href="$(ConvertTo-SafeHtml $indicator.PrimaryHref)" target="_blank" rel="noopener noreferrer">$(ConvertTo-SafeHtml $indicator.Value)</a></h2>
+              <h2 class="indicator-title"><a href="$(ConvertTo-SafeHtml (ConvertTo-SafeReportUrl $indicator.PrimaryHref))" target="_blank" rel="noopener noreferrer">$(ConvertTo-SafeHtml $indicator.Value)</a></h2>
               <div class="pill-row">
                 <span class="pill">$(ConvertTo-SafeHtml $typePill)</span>
                 $dangerPill
@@ -2089,7 +2142,7 @@ $css
 </html>
 "@
 
-    Set-Content -Path $Path -Value $html -Encoding UTF8
+    Set-Content -LiteralPath $Path -Value $html -Encoding UTF8 -ErrorAction Stop
 }
 
 # Build out the modern HTML report from the queued scan results. This is called after
@@ -2099,90 +2152,67 @@ function writeReport() {
     $script:ReportIndicators.Clear()
     getInfoBuildReport
     Write-ModernHtmlReport -Path $global:htmlReport
+    Remove-Item -LiteralPath $logFilePath -ErrorAction Stop
 }
-# Initialize the transient queue file used by indicator investigation runs.
-If(!(Test-Path $logFilePath)){ 
-    Add-Content -Path $logFilePath -Value "Domain,URLScanResult,VirusTotalScanID"
+# Each investigation gets its own queue so simultaneous runs cannot erase each other.
+if ($Investigate -or $Investigate_IPAddress -or $Investigate_Domain -or $Investigate_List) {
+    Set-Content -LiteralPath $logFilePath -Value 'Domain,URLScanResult,VirusTotalScanID' -Encoding UTF8
 }
 
-# Self-update from GitHub. The downloaded script is syntax-checked before it replaces
-# the local copy, and the current script is backed up for rollback.
-Function UpdateSOCCOM() {
-    $repoUrl = "https://github.com/ArronJablonowski/SOCCOM"
-    $candidateUrls = @(
-        "$repoUrl/raw/main/SOCCOM.ps1",
-        "$repoUrl/raw/master/SOCCOM.ps1"
-    )
-    $currentScript = Join-Path -Path (Get-Location) -ChildPath "SOCCOM.ps1"
-    $downloadPath = Join-Path -Path (Get-Location) -ChildPath "SOCCOM.update.ps1"
-    $backupPath = Join-Path -Path (Get-Location) -ChildPath ("SOCCOM.backup_{0}.ps1" -f (Get-Date).ToString("yyyyMMdd_HHmmss"))
-    $downloaded = $false
+# Update the running script, regardless of the caller's working directory. A backup
+# must succeed before replacing it; all temporary downloads are removed on failure.
+Function UpdateSOCCOM {
+    param([string]$ScriptPath = $script:SoccomScriptPath)
 
-    # Support both main and master so the updater survives common default branch names.
-    foreach ($candidateUrl in $candidateUrls) {
-        try {
-            Write-Host "Checking for SOCCOM update from: $candidateUrl"
-            Invoke-WebRequest -Uri $candidateUrl -OutFile $downloadPath -ErrorAction Stop
-            $downloaded = $true
-            break
+    $currentScript = (Get-Item -LiteralPath $ScriptPath -ErrorAction Stop).FullName
+    $scriptDirectory = Split-Path -Parent $currentScript
+    $updateId = [guid]::NewGuid().ToString('N')
+    $downloadPath = Join-Path $scriptDirectory "SOCCOM.update_$updateId.ps1"
+    $backupPath = Join-Path $scriptDirectory ("SOCCOM.backup_{0}_{1}.ps1" -f (Get-Date).ToString('yyyyMMdd_HHmmss'), $updateId)
+    try {
+        $downloaded = $false
+        foreach ($branch in 'main', 'master') {
+            $candidateUrl = "https://raw.githubusercontent.com/ArronJablonowski/SOCCOM/$branch/SOCCOM.ps1"
+            try {
+                Write-Host "Checking for SOCCOM update from: $candidateUrl"
+                Invoke-WebRequest -Uri $candidateUrl -OutFile $downloadPath -ErrorAction Stop
+                $downloaded = $true
+                break
+            }
+            catch {
+                Write-Warning "Unable to download from $candidateUrl. $($_.Exception.Message)"
+            }
         }
-        catch {
-            Write-Warning "Unable to download from $candidateUrl. $($_.Exception.Message)"
+        if (-not $downloaded) { throw 'Unable to download a SOCCOM update.' }
+
+        $tokens = $null
+        $parseErrors = $null
+        $updateAst = [System.Management.Automation.Language.Parser]::ParseFile($downloadPath, [ref]$tokens, [ref]$parseErrors)
+        if ($parseErrors -or -not ($updateAst.ParamBlock.Parameters.Name.VariablePath.UserPath -contains 'Investigate')) {
+            throw 'Downloaded update is not a valid SOCCOM script. The local script was not changed.'
         }
+        Copy-Item -LiteralPath $currentScript -Destination $backupPath -ErrorAction Stop
+        Move-Item -LiteralPath $downloadPath -Destination $currentScript -Force -ErrorAction Stop
+        Write-Host 'SOCCOM updated from GitHub.'
+        Write-Host "Backup created: $backupPath"
     }
-
-    if (-not $downloaded -or !(Test-Path $downloadPath)) {
-        Write-Host "SOCCOM update was not found on GitHub."
-        Write-Host "Please confirm SOCCOM.ps1 has been uploaded to $repoUrl."
-        Write-Host
-        Exit
+    finally {
+        if (Test-Path -LiteralPath $downloadPath) { Remove-Item -LiteralPath $downloadPath -Force }
     }
-
-    # Never replace the local tool with a downloaded file that fails PowerShell parsing.
-    $tokens = $null
-    $parseErrors = $null
-    [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $downloadPath), [ref]$tokens, [ref]$parseErrors) | Out-Null
-    if ($parseErrors) {
-        Remove-Item -Path $downloadPath -Force
-        Write-Host "Downloaded update failed PowerShell syntax validation. Local SOCCOM.ps1 was not changed."
-        $parseErrors | ForEach-Object { Write-Host " - $($_.Message)" }
-        Write-Host
-        Exit
-    }
-
-    # Remove generated helper files so a fresh run recreates dependencies after update.
-    foreach ($tempFile in 'VirusTotal.psm1') {
-        $tempPath = Get-SoccomTempPath -FileName $tempFile
-        If(Test-Path $tempPath) {Remove-Item $tempPath}
-    }
-
-    if (Test-Path $currentScript) {
-        Copy-Item -Path $currentScript -Destination $backupPath -Force
-    }
-
-    Move-Item -Path $downloadPath -Destination $currentScript -Force
-    Write-Host "SOCCOM updated from GitHub."
-    Write-Host "Backup created: $backupPath"
 }
 
 #################################################################################################################
 ############################################# Base64 Embedded Files #############################################
 #################################################################################################################
 
-# Materialize the embedded VirusTotal helper module into the temp directory. This keeps
-# SOCCOM portable while preserving the old module-based API wrappers.
-Function VirusTotalPSModule() { 
-    $virusTotalModulePath = Get-SoccomTempPath -FileName 'VirusTotal.psm1'
-    If(!(Test-Path $virusTotalModulePath)) { # - VirusTotal.psm1 - http://www.darkoperator.com
+# Load the bundled helper directly from the script. A predictable shared temp file
+# can be stale or replaced by another process before Import-Module executes it.
+Function VirusTotalPSModule() {
         $virustotal_psm1_Base64 = "PCMNCi5TeW5vcHNpcw0KICAgR2V0IGEgVmlydXNUb3RhbCBSZXBvcnQgZm9yIGEgZ2l2ZW4gSVB2NCBBZGRyZXNzDQouREVTQ1JJUFRJT04NCiAgIEdldCBhIFZpcnVzVG90YWwgUmVwb3J0IGZvciBhIGdpdmVuIElQdjQgQWRkcmVzcyB0aGF0IGhhdmUgYmVlbiBwcmV2aW91c2x5IHNjYW5uZWQuDQouRVhBTVBMRQ0KICAgR2V0LVZpcnR1c1RvdGFsSVBSZXBvcnQgLUlQQWRkcmVzcyA5MC4xNTYuMjAxLjE4IC1BUElLZXkgJEtleQ0KLkxJTksNCiAgICBodHRwOi8vd3d3LmRhcmtvcGVyYXRvci5jb20NCiAgICBodHRwczovL3d3dy52aXJ1c3RvdGFsLmNvbS9lbi9kb2N1bWVudGF0aW9uL3B1YmxpYy1hcGkvDQojPg0KZnVuY3Rpb24gR2V0LVZpcnVzVG90YWxJUFJlcG9ydA0Kew0KICAgIFtDbWRsZXRCaW5kaW5nKCldDQogICAgUGFyYW0NCiAgICAoDQogICAgICAgICMgSVAgQWRkcmVzcyB0byBzY2FuIGZvci4NCiAgICAgICAgW1BhcmFtZXRlcihNYW5kYXRvcnk9JHRydWUsDQogICAgICAgICAgICAgICAgICAgVmFsdWVGcm9tUGlwZWxpbmVCeVByb3BlcnR5TmFtZT0kdHJ1ZSwNCiAgICAgICAgICAgICAgICAgICBQb3NpdGlvbj0wKV0NCiAgICAgICAgW3N0cmluZ10kSVBBZGRyZXNzLA0KDQogICAgICAgICMgVmlydXNUb3JhbCBBUEkgS2V5Lg0KICAgICAgICBbUGFyYW1ldGVyKE1hbmRhdG9yeT0kdHJ1ZSldDQogICAgICAgIFtzdHJpbmddJEFQSUtleQ0KICAgICkNCg0KICAgIEJlZ2luDQogICAgew0KICAgICAgICAkVVJJID0gJ2h0dHBzOi8vd3d3LnZpcnVzdG90YWwuY29tL3Z0YXBpL3YyL2lwLWFkZHJlc3MvcmVwb3J0Jw0KICAgIH0NCiAgICBQcm9jZXNzDQogICAgew0KICAgICAgICBUcnkNCiAgICAgICAgew0KICAgICAgICAgICAgJElQUmVwb3J0ID0gSW52b2tlLVJlc3RNZXRob2QgLVVyaSAkVVJJIC1tZXRob2QgZ2V0IC1Cb2R5IEB7J2lwJz0gJElQQWRkcmVzczsgJ2FwaWtleSc9ICRBUElLZXl9DQogICAgICAgICAgICAkSVBSZXBvcnQucHN0eXBlbmFtZXMuaW5zZXJ0KDAsJ1ZpcnVzVG90YWwuSVAuUmVwb3J0JykNCiAgICAgICAgICAgICRJUFJlcG9ydA0KICAgICAgICB9DQogICAgICAgIENhdGNoIFtOZXQuV2ViRXhjZXB0aW9uXQ0KICAgICAgICB7DQogICAgICAgICAgICBpZiAoJEVycm9yWzBdLlRvU3RyaW5nKCkgLWxpa2UgIio0MDMqIikNCiAgICAgICAgICAgIHsNCiAgICAgICAgICAgICAgICBXcml0ZS1FcnJvciAiQVBJIGtleSBpcyBub3QgdmFsaWQuIg0KICAgICAgICAgICAgfQ0KICAgICAgICAgICAgZWxzZWlmICgkRXJyb3JbMF0uVG9TdHJpbmcoKSAtbGlrZSAiKjIwNCoiKQ0KICAgICAgICAgICAgew0KICAgICAgICAgICAgICAgIFdyaXRlLUVycm9yICJBUEkga2V5IHJhdGUgaGFzIGJlZW4gcmVhY2hlZC4iDQogICAgICAgICAgICB9DQogICAgICAgIH0NCiAgICB9DQogICAgRW5kDQogICAgew0KICAgIH0NCn0NCg0KPCMNCi5TeW5vcHNpcw0KICAgR2V0IGEgVmlydXNUb3RhbCBSZXBvcnQgZm9yIGEgZ2l2ZW4gRG9tYWluDQouREVTQ1JJUFRJT04NCiAgIEdldCBhIFZpcnVzVG90YWwgUmVwb3J0IGZvciBhIGdpdmVuIERvbWlhbiB0aGF0IGhhdmUgYmVlbiBwcmV2aW91c2x5IHNjYW5uZWQuDQouRVhBTVBMRQ0KICAgR2V0LVZpcnVzVG90YWxEb21haW5SZXBvcnQgLURvbWFpbiAnMDI3LnJ1JyAtQVBJS2V5ICRLZXkNCi5MSU5LDQogICAgaHR0cDovL3d3dy5kYXJrb3BlcmF0b3IuY29tDQogICAgaHR0cHM6Ly93d3cudmlydXN0b3RhbC5jb20vZW4vZG9jdW1lbnRhdGlvbi9wdWJsaWMtYXBpLw0KIz4NCmZ1bmN0aW9uIEdldC1WaXJ1c1RvdGFsRG9tYWluUmVwb3J0DQp7DQogICAgW0NtZGxldEJpbmRpbmcoKV0NCiAgICBQYXJhbQ0KICAgICgNCiAgICAgICAgIyBEb21haW4gdG8gc2Nhbi4NCiAgICAgICAgW1BhcmFtZXRlcihNYW5kYXRvcnk9JHRydWUsDQogICAgICAgICAgICAgICAgICAgVmFsdWVGcm9tUGlwZWxpbmVCeVByb3BlcnR5TmFtZT0kdHJ1ZSwNCiAgICAgICAgICAgICAgICAgICBQb3NpdGlvbj0wKV0NCiAgICAgICAgW3N0cmluZ10kRG9tYWluLA0KDQogICAgICAgICMgVmlydXNUb3JhbCBBUEkgS2V5Lg0KICAgICAgICBbUGFyYW1ldGVyKE1hbmRhdG9yeT0kdHJ1ZSldDQogICAgICAgIFtzdHJpbmddJEFQSUtleQ0KICAgICkNCg0KICAgIEJlZ2luDQogICAgew0KICAgICAgICAkVVJJID0gJ2h0dHBzOi8vd3d3LnZpcnVzdG90YWwuY29tL3Z0YXBpL3YyL2RvbWFpbi9yZXBvcnQnDQogICAgfQ0KICAgIFByb2Nlc3MNCiAgICB7DQogICAgICAgIFRyeQ0KICAgICAgICB7DQogICAgICAgICAgICAkRG9tYWluUmVwb3J0ID0gSW52b2tlLVJlc3RNZXRob2QgLVVyaSAkVVJJIC1tZXRob2QgZ2V0IC1Cb2R5IEB7J2RvbWFpbic9ICREb21haW47ICdhcGlrZXknPSAkQVBJS2V5fQ0KICAgICAgICAgICAgJERvbWFpblJlcG9ydC5wc3R5cGVuYW1lcy5pbnNlcnQoMCwnVmlydXNUb3RhbC5Eb21haW4uUmVwb3J0JykNCiAgICAgICAgICAgICREb21haW5SZXBvcnQNCiAgICAgICAgfQ0KICAgICAgICBDYXRjaCBbTmV0LldlYkV4Y2VwdGlvbl0NCiAgICAgICAgew0KICAgICAgICAgICAgaWYgKCRFcnJvclswXS5Ub1N0cmluZygpIC1saWtlICIqNDAzKiIpDQogICAgICAgICAgICB7DQogICAgICAgICAgICAgICAgV3JpdGUtRXJyb3IgIkFQSSBrZXkgaXMgbm90IHZhbGlkLiINCiAgICAgICAgICAgIH0NCiAgICAgICAgICAgIGVsc2VpZiAoJEVycm9yWzBdLlRvU3RyaW5nKCkgLWxpa2UgIioyMDQqIikNCiAgICAgICAgICAgIHsNCiAgICAgICAgICAgICAgICBXcml0ZS1FcnJvciAiQVBJIGtleSByYXRlIGhhcyBiZWVuIHJlYWNoZWQuIg0KICAgICAgICAgICAgfQ0KICAgICAgICB9DQogICAgfQ0KICAgIEVuZA0KICAgIHsNCiAgICB9DQp9DQoNCg0KPCMNCi5TeW5vcHNpcw0KICAgR2V0IGEgVmlydXNUb3RhbCBSZXBvcnQgZm9yIGEgZ2l2ZW4gRmlsZQ0KLkRFU0NSSVBUSU9ODQogICBHZXQgYSBWaXJ1c1RvdGFsIFJlcG9ydCBmb3IgYSBnaXZlbiBGaWxlIHRoYXQgaGF2ZSBiZWVuIHByZXZpb3VzbHkgc2Nhbm5lZC4NCiAgIEEgTUQ1LCBTSEExIG9yIFNIQTIgQ3J5cHRwZ3JhcGhpYyBIYXNoIGNhbiBiZSBwcm92aWRlZCBvciBhIFNjYW5JRCBmb3IgYSBGaWxlLg0KICAgVXAgdG8gNCBmaWxlIHJlcG9yc3QgY2FuIGJlIHJldHJpZXZlIGF0IHRoZSBzYW1lIHRpbWUuDQouRVhBTVBMRQ0KICAgR2V0LVZpcnVzVG90YWxGaWxlUmVwb3J0IC1SZXNvdXJjZSA5OTAxN2Y2ZWViYmFjMjRmMzUxNDE1ZGQ0MTBkNTIyZCAtQVBJS2V5ICRLZXkNCi5MSU5LDQogICAgaHR0cDovL3d3dy5kYXJrb3BlcmF0b3IuY29tDQogICAgaHR0cHM6Ly93d3cudmlydXN0b3RhbC5jb20vZW4vZG9jdW1lbnRhdGlvbi9wdWJsaWMtYXBpLw0KIz4NCmZ1bmN0aW9uIEdldC1WaXJ1c1RvdGFsRmlsZVJlcG9ydA0Kew0KICAgIFtDbWRsZXRCaW5kaW5nKCldDQogICAgUGFyYW0NCiAgICAoDQogICAgICAgICMgRmlsZSBNRDUgQ2hlY2tzdW0sIEZpbGUgU0hBMSBDaGVja3N1bSwgRmlsZSBTSEEyNTYgQ2hlY2tzdW0gb3IgU2NhbklEIHRvIHF1ZXJ5Lg0KICAgICAgICBbUGFyYW1ldGVyKE1hbmRhdG9yeT0kdHJ1ZSwNCiAgICAgICAgICAgICAgICAgICBWYWx1ZUZyb21QaXBlbGluZUJ5UHJvcGVydHlOYW1lPSR0cnVlLA0KICAgICAgICAgICAgICAgICAgIFBvc2l0aW9uPTApXQ0KICAgICAgICBbVmFsaWRhdGVDb3VudCgxLDQpXQ0KICAgICAgICBbc3RyaW5nW11dJFJlc291cmNlLA0KDQogICAgICAgICMgVmlydXNUb3JhbCBBUEkgS2V5Lg0KICAgICAgICBbUGFyYW1ldGVyKE1hbmRhdG9yeT0kdHJ1ZSldDQogICAgICAgIFtzdHJpbmddJEFQSUtleQ0KICAgICkNCg0KICAgIEJlZ2luDQogICAgew0KICAgICAgICAkVVJJID0gJ2h0dHBzOi8vd3d3LnZpcnVzdG90YWwuY29tL3Z0YXBpL3YyL2ZpbGUvcmVwb3J0Jw0KICAgIH0NCiAgICBQcm9jZXNzDQogICAgew0KICAgICAgICAkUXVlcnlSZXNvdXJjZXMgPSAgJFJlc291cmNlIC1qb2luICIsIg0KDQogICAgICAgIFRyeQ0KICAgICAgICB7DQogICAgICAgICAgICAkUmVwb3J0UmVzdWx0ID1JbnZva2UtUmVzdE1ldGhvZCAtVXJpICRVUkkgLW1ldGhvZCBnZXQgLUJvZHkgQHsncmVzb3VyY2UnPSAkUXVlcnlSZXNvdXJjZXM7ICdhcGlrZXknPSAkQVBJS2V5fQ0KICAgICAgICAgICAgZm9yZWFjaCAoJEZpbGVSZXBvcnQgaW4gJFJlcG9ydFJlc3VsdCkNCiAgICAgICAgICAgIHsNCiAgICAgICAgICAgICAgICAkRmlsZVJlcG9ydC5wc3R5cGVuYW1lcy5pbnNlcnQoMCwnVmlydXNUb3RhbC5GaWxlLlJlcG9ydCcpDQogICAgICAgICAgICAgICAgJEZpbGVSZXBvcnQNCiAgICAgICAgICAgIH0NCiAgICAgICAgfQ0KICAgICAgICBDYXRjaCBbTmV0LldlYkV4Y2VwdGlvbl0NCiAgICAgICAgew0KICAgICAgICAgICAgaWYgKCRFcnJvclswXS5Ub1N0cmluZygpIC1saWtlICIqNDAzKiIpDQogICAgICAgICAgICB7DQogICAgICAgICAgICAgICAgV3JpdGUtRXJyb3IgIkFQSSBrZXkgaXMgbm90IHZhbGlkLiINCiAgICAgICAgICAgIH0NCiAgICAgICAgICAgIGVsc2VpZiAoJEVycm9yWzBdLlRvU3RyaW5nKCkgLWxpa2UgIioyMDQqIikNCiAgICAgICAgICAgIHsNCiAgICAgICAgICAgICAgICBXcml0ZS1FcnJvciAiQVBJIGtleSByYXRlIGhhcyBiZWVuIHJlYWNoZWQuIg0KICAgICAgICAgICAgfQ0KICAgICAgICB9DQogICAgfQ0KICAgIEVuZA0KICAgIHsNCiAgICB9DQp9DQoNCg0KPCMNCi5TeW5vcHNpcw0KICAgR2V0IGEgVmlydXNUb3RhbCBSZXBvcnQgZm9yIGEgZ2l2ZW4gVVJMDQouREVTQ1JJUFRJT04NCiAgIEdldCBhIFZpcnVzVG90YWwgUmVwb3J0IGZvciBhIGdpdmVuIFVSTCB0aGF0IGhhdmUgYmVlbiBwcmV2aW91c2x5IHNjYW5uZWQuDQogICBBIFVSTCBvciBhIFNjYW5JRCBmb3IgcHJldm91cyBzY2FuLiBVcCB0byA0IFVSTCByZXBvcnN0IGNhbiBiZSByZXRyaWV2ZSBhdCB0aGUgc2FtZSB0aW1lLg0KLkVYQU1QTEUNCiAgIEdldC1WaXJ1c1RvdGFsVVJMUmVwb3J0IC1SZXNvdXJjZSBodHRwOi8vd3d3LmRhcmtvcGVyYXRvci5jb20gLUFQSUtleSAkS2V5DQouTElOSw0KICAgIGh0dHA6Ly93d3cuZGFya29wZXJhdG9yLmNvbQ0KICAgIGh0dHBzOi8vd3d3LnZpcnVzdG90YWwuY29tL2VuL2RvY3VtZW50YXRpb24vcHVibGljLWFwaS8NCiM+DQpmdW5jdGlvbiBHZXQtVmlydXNUb3RhbFVSTFJlcG9ydA0Kew0KICAgIFtDbWRsZXRCaW5kaW5nKCldDQogICAgUGFyYW0NCiAgICAoDQogICAgICAgICMgVVJMIG9yIFNjYW5JRCB0byBxdWVyeS4NCiAgICAgICAgW1BhcmFtZXRlcihNYW5kYXRvcnk9JHRydWUsDQogICAgICAgICAgICAgICAgICAgVmFsdWVGcm9tUGlwZWxpbmVCeVByb3BlcnR5TmFtZT0kdHJ1ZSwNCiAgICAgICAgICAgICAgICAgICBQb3NpdGlvbj0wKV0NCiAgICAgICAgW1ZhbGlkYXRlQ291bnQoMSw0KV0NCiAgICAgICAgW3N0cmluZ1tdXSRSZXNvdXJjZSwNCg0KICAgICAgICAjIFZpcnVzVG9yYWwgQVBJIEtleS4NCiAgICAgICAgW1BhcmFtZXRlcihNYW5kYXRvcnk9JHRydWUpXQ0KICAgICAgICBbc3RyaW5nXSRBUElLZXksDQoNCiAgICAgICAgIyBBdXRvbWF0aWNhbGx5IHN1Ym1pdCB0aGUgVVJMIGZvciBhbmFseXNpcyBpZiBubyByZXBvcnQgaXMgZm91bmQgZm9yIGl0IGluIFZpcnVzVG90YWwuDQogICAgICAgIFtQYXJhbWV0ZXIoTWFuZGF0b3J5PSRmYWxzZSldDQogICAgICAgIFtzd2l0Y2hdJFNjYW4NCiAgICApDQoNCiAgICBCZWdpbg0KICAgIHsNCiAgICAgICAgJFVSSSA9ICdodHRwczovL3d3dy52aXJ1c3RvdGFsLmNvbS92dGFwaS92Mi91cmwvcmVwb3J0Jw0KICAgICAgICBpZiAoJFNjYW4pDQogICAgICAgIHsNCiAgICAgICAgICAgICRzY2FudXJsID0gMQ0KICAgICAgICB9DQogICAgICAgIGVsc2UNCiAgICAgICAgew0KICAgICAgICAgICAgJHNjYW51cmwgPSAwDQogICAgICAgIH0NCiAgICB9DQogICAgUHJvY2Vzcw0KICAgIHsNCiAgICAgICAgJFF1ZXJ5UmVzb3VyY2VzID0gICRSZXNvdXJjZSAtam9pbiAiLCINCg0KICAgICAgICBUcnkNCiAgICAgICAgew0KICAgICAgICAgICAgJFJlcG9ydFJlc3VsdCA9IEludm9rZS1SZXN0TWV0aG9kIC1VcmkgJFVSSSAtbWV0aG9kIGdldCAtQm9keSBAeydyZXNvdXJjZSc9ICRRdWVyeVJlc291cmNlczsgJ2FwaWtleSc9ICRBUElLZXk7ICdzY2FuJz0kc2NhbnVybH0NCiAgICAgICAgICAgIGZvcmVhY2ggKCRVUkxSZXBvcnQgaW4gJFJlcG9ydFJlc3VsdCkNCiAgICAgICAgICAgIHsNCiAgICAgICAgICAgICAgICAkVVJMUmVwb3J0LnBzdHlwZW5hbWVzLmluc2VydCgwLCdWaXJ1c1RvdGFsLlVSTC5SZXBvcnQnKQ0KICAgICAgICAgICAgICAgICRVUkxSZXBvcnQNCiAgICAgICAgICAgIH0NCiAgICAgICAgfQ0KICAgICAgICBDYXRjaCBbTmV0LldlYkV4Y2VwdGlvbl0NCiAgICAgICAgew0KICAgICAgICAgICAgaWYgKCRFcnJvclswXS5Ub1N0cmluZygpIC1saWtlICIqNDAzKiIpDQogICAgICAgICAgICB7DQogICAgICAgICAgICAgICAgV3JpdGUtRXJyb3IgIkFQSSBrZXkgaXMgbm90IHZhbGlkLiINCiAgICAgICAgICAgIH0NCiAgICAgICAgICAgIGVsc2VpZiAoJEVycm9yWzBdLlRvU3RyaW5nKCkgLWxpa2UgIioyMDQqIikNCiAgICAgICAgICAgIHsNCiAgICAgICAgICAgICAgICBXcml0ZS1FcnJvciAiQVBJIGtleSByYXRlIGhhcyBiZWVuIHJlYWNoZWQuIg0KICAgICAgICAgICAgfQ0KICAgICAgICB9DQogICAgfQ0KICAgIEVuZA0KICAgIHsNCiAgICB9DQp9DQoNCg0KPCMNCi5TeW5vcHNpcw0KICAgU3VibWl0IGEgVVJMIGZvciBzY2FubmluZyBieSBWaXJ1c1RvdGFsDQouREVTQ1JJUFRJT04NCiAgIFN1Ym1pdCBhIFVSTCBmb3Igc2Nhbm5pbmcgYnkgVmlydXNUb3RhbC4gVXAgdG8gNCBVUkxjYW4gYmUgc3VibWl0dGVkIGF0IHRoZSBzYW1lIHRpbWUuDQouRVhBTVBMRQ0KICAgU3VibWl0LVZpcnVzVG90YWxVUkwgLVVSTCAiaHR0cDovL3d3dy5kYXJrb3BlcmF0b3IuY29tIiwiaHR0cDovL2dhbWlsLmNvbSIgLUFQSUtleSAkS2V5DQouTElOSw0KICAgIGh0dHA6Ly93d3cuZGFya29wZXJhdG9yLmNvbQ0KICAgIGh0dHBzOi8vd3d3LnZpcnVzdG90YWwuY29tL2VuL2RvY3VtZW50YXRpb24vcHVibGljLWFwaS8NCiM+DQpmdW5jdGlvbiBTdWJtaXQtVmlydXNUb3RhbFVSTA0Kew0KICAgIFtDbWRsZXRCaW5kaW5nKCldDQogICAgUGFyYW0NCiAgICAoDQogICAgICAgICMgVVJMIG9yIFNjYW5JRCB0byBxdWVyeS4NCiAgICAgICAgW1BhcmFtZXRlcihNYW5kYXRvcnk9JHRydWUsDQogICAgICAgICAgICAgICAgICAgVmFsdWVGcm9tUGlwZWxpbmVCeVByb3BlcnR5TmFtZT0kdHJ1ZSwNCiAgICAgICAgICAgICAgICAgICBQb3NpdGlvbj0wKV0NCiAgICAgICAgW1ZhbGlkYXRlQ291bnQoMSw0KV0NCiAgICAgICAgW3N0cmluZ1tdXSRVUkwsDQoNCiAgICAgICAgIyBWaXJ1c1RvcmFsIEFQSSBLZXkuDQogICAgICAgIFtQYXJhbWV0ZXIoTWFuZGF0b3J5PSR0cnVlKV0NCiAgICAgICAgW3N0cmluZ10kQVBJS2V5LA0KDQogICAgICAgICMgQXV0b21hdGljYWxseSBzdWJtaXQgdGhlIFVSTCBmb3IgYW5hbHlzaXMgaWYgbm8gcmVwb3J0IGlzIGZvdW5kIGZvciBpdCBpbiBWaXJ1c1RvdGFsLg0KICAgICAgICBbUGFyYW1ldGVyKE1hbmRhdG9yeT0kZmFsc2UpXQ0KICAgICAgICBbc3dpdGNoXSRTY2FuDQogICAgKQ0KDQogICAgQmVnaW4NCiAgICB7DQogICAgICAgICRVUkkgPSAnaHR0cHM6Ly93d3cudmlydXN0b3RhbC5jb20vdnRhcGkvdjIvdXJsL3NjYW4nDQogICAgICAgIGlmICgkU2NhbikNCiAgICAgICAgew0KICAgICAgICAgICAgJHNjYW51cmwgPSAxDQogICAgICAgIH0NCiAgICAgICAgZWxzZQ0KICAgICAgICB7DQogICAgICAgICAgICAkc2NhbnVybCA9IDANCiAgICAgICAgfQ0KICAgIH0NCiAgICBQcm9jZXNzDQogICAgew0KICAgICAgICAkVVJMTGlzdCA9ICAkVVJMIC1qb2luICJgbiINCg0KICAgICAgICBUcnkNCiAgICAgICAgew0KICAgICAgICAgICAgJFN1Ym1pdGVkTGlzdCA9IEludm9rZS1SZXN0TWV0aG9kIC1VcmkgJFVSSSAtbWV0aG9kIFBvc3QgLUJvZHkgQHsndXJsJz0gJFVSTExpc3Q7ICdhcGlrZXknPSAkQVBJS2V5fQ0KICAgICAgICAgICAgZm9yZWFjaCgkc3VibWl0ZWQgaW4gJFN1Ym1pdGVkTGlzdCkNCiAgICAgICAgICAgIHsNCiAgICAgICAgICAgICAgICAkc3VibWl0ZWQucHN0eXBlbmFtZXMuaW5zZXJ0KDAsJ1ZpcnVzVG90YWwuVVJMLlN1Ym1pc3Npb24nKQ0KICAgICAgICAgICAgICAgICRzdWJtaXRlZA0KICAgICAgICAgICAgfQ0KICAgICAgICB9DQogICAgICAgIENhdGNoIFtOZXQuV2ViRXhjZXB0aW9uXQ0KICAgICAgICB7DQogICAgICAgICAgICBpZiAoJEVycm9yWzBdLlRvU3RyaW5nKCkgLWxpa2UgIio0MDMqIikNCiAgICAgICAgICAgIHsNCiAgICAgICAgICAgICAgICBXcml0ZS1FcnJvciAiQVBJIGtleSBpcyBub3QgdmFsaWQuIg0KICAgICAgICAgICAgfQ0KICAgICAgICAgICAgZWxzZWlmICgkRXJyb3JbMF0uVG9TdHJpbmcoKSAtbGlrZSAiKjIwNCoiKQ0KICAgICAgICAgICAgew0KICAgICAgICAgICAgICAgIFdyaXRlLUVycm9yICJBUEkga2V5IHJhdGUgaGFzIGJlZW4gcmVhY2hlZC4iDQogICAgICAgICAgICB9DQogICAgICAgIH0NCiAgICB9DQogICAgRW5kDQogICAgew0KICAgIH0NCn0NCg0KPCMNCi5TeW5vcHNpcw0KICAgU3VibWl0IGEgRmlsZSBmb3Igc2Nhbm5pbmcgYnkgVmlydXNUb3RhbA0KLkRFU0NSSVBUSU9ODQogICBTdWJtaXQgYSBGaWxlIGZvciBzY2FubmluZyBieSBWaXJ1c1RvdGFsLiBGaWxlIHNpemUgaXMgbGltaXRlZCB0byAyME1CLg0KLkVYQU1QTEUNCiAgIFN1Ym1pdC1WaXJ1c1RvdGFsRmlsZSAtRmlsZSBDOlxiYWNrZG9vci5kbGwgLUFQSUtleSAkS2V5DQouTElOSw0KICAgIGh0dHA6Ly93d3cuZGFya29wZXJhdG9yLmNvbQ0KICAgIGh0dHBzOi8vd3d3LnZpcnVzdG90YWwuY29tL2VuL2RvY3VtZW50YXRpb24vcHVibGljLWFwaS8NCiM+DQpmdW5jdGlvbiBTdWJtaXQtVmlydXNUb3RhbEZpbGUNCnsNCiAgICBbQ21kbGV0QmluZGluZygpXQ0KICAgIFBhcmFtDQogICAgKA0KICAgICAgICAjIFVSTCBvciBTY2FuSUQgdG8gcXVlcnkuDQogICAgICAgIFtQYXJhbWV0ZXIoTWFuZGF0b3J5PSR0cnVlLA0KICAgICAgICAgICAgICAgICAgIFZhbHVlRnJvbVBpcGVsaW5lQnlQcm9wZXJ0eU5hbWU9JHRydWUsDQogICAgICAgICAgICAgICAgICAgUG9zaXRpb249MCldDQogICAgICAgIFtWYWxpZGF0ZVNjcmlwdCh7VGVzdC1QYXRoICRfIC1QYXRoVHlwZSBMZWFmfSldDQogICAgICAgIFtzdHJpbmddJEZpbGUsDQoNCiAgICAgICAgIyBWaXJ1c1RvcmFsIEFQSSBLZXkuDQogICAgICAgIFtQYXJhbWV0ZXIoTWFuZGF0b3J5PSR0cnVlKV0NCiAgICAgICAgW3N0cmluZ10kQVBJS2V5DQogICAgKQ0KDQogICAgQmVnaW4NCiAgICB7DQogICAgICAgICRVUkkgPSAiaHR0cDovL3d3dy52aXJ1c3RvdGFsLmNvbS92dGFwaS92Mi9maWxlL3NjYW4iDQogICAgfQ0KICAgIFByb2Nlc3MNCiAgICB7DQogICAgICAgICRmaWxlaW5mbyA9IEdldC1JdGVtUHJvcGVydHkgLVBhdGggJEZpbGUNCg0KICAgICAgICAjIENoZWNrIHRoZSBmaWxlIHNpemUNCiAgICAgICAgaWYgKCRmaWxlaW5mby5sZW5ndGggLWd0IDY0bWIpDQogICAgICAgIHsNCiAgICAgICAgICAgIFdyaXRlLUVycm9yICJWaXJ1c1RvdGFsIGhhcyBhIGxpbWl0IG9mIDY0TUIgcGVyIGZpbGUgc3VibWl0ZWQiIC1FcnJvckFjdGlvbiBTdG9wDQogICAgICAgIH0NCiAgIA0KICAgICAgICAkcmVxID0gW1N5c3RlbS5OZXQuaHR0cFdlYlJlcXVlc3RdW1N5c3RlbS5OZXQuV2ViUmVxdWVzdF06OkNyZWF0ZSgiaHR0cDovL3d3dy52aXJ1c3RvdGFsLmNvbS92dGFwaS92Mi9maWxlL3NjYW4iKQ0KICAgICAgICAkcmVxLkhlYWRlcnMgPSAkaGVhZGVycw0KICAgICAgICAkcmVxLk1ldGhvZCA9ICJQT1NUIg0KICAgICAgICAkcmVxLkFsbG93V3JpdGVTdHJlYW1CdWZmZXJpbmcgPSAkdHJ1ZTsNCiAgICAgICAgJHJlcS5TZW5kQ2h1bmtlZCA9ICRmYWxzZTsNCiAgICAgICAgJHJlcS5LZWVwQWxpdmUgPSAkdHJ1ZTsNCg0KICAgICAgICAkaGVhZGVycyA9IE5ldy1PYmplY3QgLVR5cGVOYW1lIFN5c3RlbS5OZXQuV2ViSGVhZGVyQ29sbGVjdGlvbg0KDQogICAgICAgICMgUHJlcCB0aGUgUE9TVCBIZWFkZXJzIGZvciB0aGUgbWVzc2FnZQ0KICAgICAgICAkaGVhZGVycy5hZGQoImFwaWtleSIsJGFwaWtleSkNCiAgICAgICAgJGJvdW5kYXJ5ID0gIi0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0iICsgW0RhdGVUaW1lXTo6Tm93LlRpY2tzLlRvU3RyaW5nKCJ4IikNCiAgICAgICAgJHJlcS5Db250ZW50VHlwZSA9ICJtdWx0aXBhcnQvZm9ybS1kYXRhOyBib3VuZGFyeT0iICsgJGJvdW5kYXJ5DQogICAgICAgIFtieXRlW11dJGJvdW5kYXJ5Ynl0ZXMgPSBbU3lzdGVtLlRleHQuRW5jb2RpbmddOjpBU0NJSS5HZXRCeXRlcygiYHJgbi0tIiArICRib3VuZGFyeSArICJgcmBuIikNCiAgICAgICAgW3N0cmluZ10kZm9ybWRhdGFUZW1wbGF0ZSA9ICJgcmBuLS0iICsgJGJvdW5kYXJ5ICsgImByYG5Db250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9YCJ7MH1gIjtgcmBuYHJgbnsxfSINCiAgICAgICAgW3N0cmluZ10kZm9ybWl0ZW0gPSBbc3RyaW5nXTo6Rm9ybWF0KCRmb3JtZGF0YVRlbXBsYXRlLCAiYXBpa2V5IiwgJGFwaWtleSkNCiAgICAgICAgW2J5dGVbXV0kZm9ybWl0ZW1ieXRlcyA9IFtTeXN0ZW0uVGV4dC5FbmNvZGluZ106OlVURjguR2V0Qnl0ZXMoJGZvcm1pdGVtKQ0KICAgICAgICBbc3RyaW5nXSRoZWFkZXJUZW1wbGF0ZSA9ICJDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9YCJ7MH1gIjsgZmlsZW5hbWU9YCJ7MX1gImByYG5Db250ZW50LVR5cGU6IGFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbWByYG5gcmBuIg0KICAgICAgICBbc3RyaW5nXSRoZWFkZXIgPSBbc3RyaW5nXTo6Rm9ybWF0KCRoZWFkZXJUZW1wbGF0ZSwgImZpbGUiLCAoZ2V0LWl0ZW0gJGZpbGUpLm5hbWUpDQogICAgICAgIFtieXRlW11dJGhlYWRlcmJ5dGVzID0gW1N5c3RlbS5UZXh0LkVuY29kaW5nXTo6VVRGOC5HZXRCeXRlcygkaGVhZGVyKQ0KICAgICAgICBbc3RyaW5nXSRmb290ZXJUZW1wbGF0ZSA9ICJDb250ZW50LURpc3Bvc2l0aW9uOiBmb3JtLWRhdGE7IG5hbWU9YCJVcGxvYWRgImByYG5gcmBuU3VibWl0IFF1ZXJ5YHJgbiIgKyAkYm91bmRhcnkgKyAiLS0iDQogICAgICAgIFtieXRlW11dJGZvb3RlckJ5dGVzID0gW1N5c3RlbS5UZXh0LkVuY29kaW5nXTo6VVRGOC5HZXRCeXRlcygkZm9vdGVyVGVtcGxhdGUpDQoNCg0KICAgICAgICAjIFJlYWQgdGhlIGZpbGUgYW5kIGZvcm1hdCB0aGUgbWVzc2FnZQ0KICAgICAgICAkc3RyZWFtID0gJHJlcS5HZXRSZXF1ZXN0U3RyZWFtKCkNCiAgICAgICAgJHJkciA9IG5ldy1vYmplY3QgU3lzdGVtLklPLkZpbGVTdHJlYW0oJGZpbGVpbmZvLkZ1bGxOYW1lLCBbU3lzdGVtLklPLkZpbGVNb2RlXTo6T3BlbiwgW1N5c3RlbS5JTy5GaWxlQWNjZXNzXTo6UmVhZCkNCiAgICAgICAgW2J5dGVbXV0kYnVmZmVyID0gbmV3LW9iamVjdCBieXRlW10gJHJkci5MZW5ndGgNCiAgICAgICAgW2ludF0kdG90YWwgPSBbaW50XSRjb3VudCA9IDANCiAgICAgICAgJHN0cmVhbS5Xcml0ZSgkZm9ybWl0ZW1ieXRlcywgMCwgJGZvcm1pdGVtYnl0ZXMuTGVuZ3RoKQ0KICAgICAgICAkc3RyZWFtLldyaXRlKCRib3VuZGFyeWJ5dGVzLCAwLCAkYm91bmRhcnlieXRlcy5MZW5ndGgpDQogICAgICAgICRzdHJlYW0uV3JpdGUoJGhlYWRlcmJ5dGVzLCAwLCRoZWFkZXJieXRlcy5MZW5ndGgpDQogICAgICAgICRjb3VudCA9ICRyZHIuUmVhZCgkYnVmZmVyLCAwLCAkYnVmZmVyLkxlbmd0aCkNCiAgICAgICAgZG97DQogICAgICAgICAgICAkc3RyZWFtLldyaXRlKCRidWZmZXIsIDAsICRjb3VudCkNCiAgICAgICAgICAgICRjb3VudCA9ICRyZHIuUmVhZCgkYnVmZmVyLCAwLCAkYnVmZmVyLkxlbmd0aCkNCiAgICAgICAgfXdoaWxlICgkY291bnQgPiAwKQ0KICAgICAgICAkc3RyZWFtLldyaXRlKCRib3VuZGFyeWJ5dGVzLCAwLCAkYm91bmRhcnlieXRlcy5MZW5ndGgpDQogICAgICAgICRzdHJlYW0uV3JpdGUoJGZvb3RlckJ5dGVzLCAwLCAkZm9vdGVyQnl0ZXMuTGVuZ3RoKQ0KICAgICAgICAkc3RyZWFtLmNsb3NlKCkNCg0KICAgICAgICBUcnkNCiAgICAgICAgew0KICAgICAgICAgICAgIyBVcGxvYWQgdGhlIGZpbGUNCiAgICAgICAgICAgICRyZXNwb25zZSA9ICRyZXEuR2V0UmVzcG9uc2UoKQ0KDQogICAgICAgICAgICAjIFJlYWQgdGhlIHJlc3BvbnNlDQogICAgICAgICAgICAkcmVzcHN0cmVhbSA9ICRyZXNwb25zZS5HZXRSZXNwb25zZVN0cmVhbSgpDQogICAgICAgICAgICAkc3IgPSBuZXctb2JqZWN0IFN5c3RlbS5JTy5TdHJlYW1SZWFkZXIgJHJlc3BzdHJlYW0NCiAgICAgICAgICAgICRyZXN1bHQgPSAkc3IuUmVhZFRvRW5kKCkNCiAgICAgICAgICAgIENvbnZlcnRGcm9tLUpzb24gJHJlc3VsdA0KICAgICAgICB9DQogICAgICAgIENhdGNoIFtOZXQuV2ViRXhjZXB0aW9uXQ0KICAgICAgICB7DQogICAgICAgICAgICBpZiAoJEVycm9yWzBdLlRvU3RyaW5nKCkgLWxpa2UgIio0MDMqIikNCiAgICAgICAgICAgIHsNCiAgICAgICAgICAgICAgICBXcml0ZS1FcnJvciAiQVBJIGtleSBpcyBub3QgdmFsaWQuIg0KICAgICAgICAgICAgfQ0KICAgICAgICAgICAgZWxzZWlmICgkRXJyb3JbMF0uVG9TdHJpbmcoKSAtbGlrZSAiKjIwNCoiKQ0KICAgICAgICAgICAgew0KICAgICAgICAgICAgICAgIFdyaXRlLUVycm9yICJBUEkga2V5IHJhdGUgaGFzIGJlZW4gcmVhY2hlZC4iDQogICAgICAgICAgICB9DQogICAgICAgIH0NCiAgICB9DQogICAgRW5kDQogICAgew0KICAgIH0NCn0="
-        $Content = [System.Convert]::FromBase64String($virustotal_psm1_Base64)
-        [System.IO.File]::WriteAllBytes($virusTotalModulePath, $Content)
-        Start-Sleep -Seconds 1
-    }
+    $moduleText = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($virustotal_psm1_Base64))
+    New-Module -Name SOCCOM.VirusTotal -ScriptBlock ([scriptblock]::Create($moduleText))
 }
-VirusTotalPSModule
-# Import the generated VirusTotal module before any investigation switches execute.
-Import-Module (Get-SoccomTempPath -FileName 'VirusTotal.psm1')
+VirusTotalPSModule | Import-Module -Force
 
 ##################################################################################################
 ############################################# Banner #############################################
@@ -2213,8 +2243,7 @@ If (!([string]::IsNullOrEmpty($Investigate))){	 ### SWITCH: -Investigate ###
     Write-IndicatorInvestigationReport -Indicator $Investigate
 }ElseIf (!([string]::IsNullOrEmpty($Investigate_IPAddress))) {	 ### SWITCH: -Investigate_IPAddress ###
     if (-not (Test-IPAddress -Value $Investigate_IPAddress)) {
-        Write-Host "Invalid IP address: $Investigate_IPAddress"
-        Exit
+        throw "Invalid IP address: $Investigate_IPAddress"
     }
     Invoke-IndicatorInvestigation -Indicator $Investigate_IPAddress
     Write-IndicatorInvestigationReport -Indicator $Investigate_IPAddress
@@ -2223,88 +2252,80 @@ If (!([string]::IsNullOrEmpty($Investigate))){	 ### SWITCH: -Investigate ###
     Write-IndicatorInvestigationReport -Indicator $Investigate_Domain
 }ElseIf (!([string]::IsNullOrEmpty($Investigate_List))) {### SWITCH: -Investigate_List ### 
     $filebasename = [System.IO.Path]::GetFileNameWithoutExtension($Investigate_List)
-    $input = $Investigate_List.Trim() 
-    Write-Host "Reading File: $input"
-    If(Test-Path $input) { # If file found 
-        # List investigations reuse the same CSV queue but write one combined report.
-        foreach($line in Get-Content $input) { # read file line by line
-            if(Test-IPAddress -Value $line){ # line is an IP address 
-             Write-Host "$line"
-             checkIPAddress($line)
-            }Else{ # treat the line as a domain
-             Write-Host "$line"
-             checkDomain($line)
-            }
-        }
+    $searchValue = $Investigate_List.Trim()
+    Write-Host "Reading File: $searchValue"
+    $indicators = @(Get-SoccomInputList -Path $searchValue)
+    foreach ($line in $indicators) {
+        Invoke-IndicatorInvestigation -Indicator $line
+    }
     writeReport
     $safeFileBaseName = ConvertTo-SafeFileName -Value $filebasename
     $newReport = "$resultsFolder\$(New-TimestampedReportFileName -BaseName $safeFileBaseName)"
-    Copy-Item -Path $global:htmlReport -Destination $newReport -Force
-    Invoke-Item $newReport
-    Remove-Item $global:htmlReport    
-    }Else{ # if filePath not found 
-        Write-Host "File was not found."
-        Exit
-    }
+    Copy-Item -LiteralPath $global:htmlReport -Destination $newReport -ErrorAction Stop
+    Invoke-Item -LiteralPath $newReport
+    Remove-Item -LiteralPath $global:htmlReport
 }ElseIf (!([string]::IsNullOrEmpty($Search_ADUsername))) {	 ### SWITCH: -Search_ADUsername###
-    import-module activedirectory
-    $input = $Search_ADUsername.Trim()
-    Write-Host "Searching Active Directory: $input"
+    Import-Module ActiveDirectory -ErrorAction Stop
+    $searchValue = $Search_ADUsername.Trim()
+    Write-Host "Searching Active Directory: $searchValue"
     # Return a broad account profile because SOC triage often needs identity context,
     # contact details, account status, and password timing in one terminal view.
-    Get-ADUser -Filter "samaccountname -like '$input*'" -Properties * | Select-Object -Property SamAccountName,GivenName,Othername,Surname,EmployeeID,employeeType,Enabled,DisplayName,Description,Title,Department,Manager,MobilePhone,TelephoneNumber,OfficePhone,EmailAddress,StreetAddress,City,State,PostalCode,PasswordNeverExpires,PasswordNotRequired,PasswordLastSet,LastBadPasswordAttempt,LastLogonDate,LockedOut,WhenCreated,WhenChanged,logonCount,LogonWorkstations,SID | Format-List
+    Get-ADUser -LDAPFilter "(sAMAccountName=$(ConvertTo-LdapFilterValue $searchValue)*)" -Properties * -ErrorAction Stop | Select-Object -Property SamAccountName,GivenName,Othername,Surname,EmployeeID,employeeType,Enabled,DisplayName,Description,Title,Department,Manager,MobilePhone,TelephoneNumber,OfficePhone,EmailAddress,StreetAddress,City,State,PostalCode,PasswordNeverExpires,PasswordNotRequired,PasswordLastSet,LastBadPasswordAttempt,LastLogonDate,LockedOut,WhenCreated,WhenChanged,logonCount,LogonWorkstations,SID | Format-List
     # Show group membership separately so role/context jumps out during triage.
     Write-Host "Groups" -BackgroundColor "Cyan" -ForegroundColor "Black"
-    (Get-ADUser -Filter "samaccountname -like '$input*'" -Properties * | Select-Object -Property MemberOf).MemberOf | Sort-Object | ForEach-Object {$_.split(",")[0].replace("CN=","")}
+    (Get-ADUser -LDAPFilter "(sAMAccountName=$(ConvertTo-LdapFilterValue $searchValue)*)" -Properties * -ErrorAction Stop | Select-Object -Property MemberOf).MemberOf | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object | ForEach-Object {$_.split(",")[0].replace("CN=","")}
 }ElseIf (!([string]::IsNullOrEmpty($Search_ADUserList))) { ### SWITCH: -Search_ADUserList ###
-    import-module activedirectory
+    Import-Module ActiveDirectory -ErrorAction Stop
+    $users = @(Get-SoccomInputList -Path $Search_ADUserList.Trim())
     $userListPath = "$resultsFolder\UserList.csv"
     $not_found_users = "$resultsFolder\UsersNotFoundList.csv"
     If(Test-Path $userListPath) { # If file found
         Remove-Item $userListPath # remove log file   
     }
-    $input = $Search_ADUserList.Trim()
-    Write-Host "Reading File: $input"
+    $searchValue = $Search_ADUserList.Trim()
+    Write-Host "Reading File: $searchValue"
+    if (Test-Path -LiteralPath $not_found_users) { Remove-Item -LiteralPath $not_found_users -ErrorAction Stop }
     # Keep found users and misses in separate CSV outputs so analysts can act on both.
-    $newFile = foreach($user in Get-Content $input) {
+    $newFile = foreach($user in $users) {
        Write-Host "$user"  
        Start-Sleep -s 1
-       $aduser = Get-ADUser -Filter "samaccountname -like '$user'" -Properties * | Select-Object -Property SamAccountName,GivenName,Othername,Surname,EmployeeID,employeeType,Enabled,DisplayName,Description,Title,Department,Manager,MobilePhone,TelephoneNumber,OfficePhone,EmailAddress,StreetAddress,City,State,PostalCode,PasswordNeverExpires,PasswordNotRequired,PasswordLastSet,LastBadPasswordAttempt,LastLogonDate,LockedOut,WhenCreated,WhenChanged,logonCount,LogonWorkstations,SID,MemberOf
+       $aduser = Get-ADUser -LDAPFilter "(sAMAccountName=$(ConvertTo-LdapFilterValue $user))" -Properties * -ErrorAction Stop | Select-Object -Property SamAccountName,GivenName,Othername,Surname,EmployeeID,employeeType,Enabled,DisplayName,Description,Title,Department,Manager,MobilePhone,TelephoneNumber,OfficePhone,EmailAddress,StreetAddress,City,State,PostalCode,PasswordNeverExpires,PasswordNotRequired,PasswordLastSet,LastBadPasswordAttempt,LastLogonDate,LockedOut,WhenCreated,WhenChanged,logonCount,LogonWorkstations,SID,MemberOf
        if ($aduser -eq $null ){
         Write-Host "USER NOT FOUND: $user" -ForegroundColor Yellow
             Add-Content -Path $not_found_users -Value $user
        }
        $aduser 
     } 
-    $newFile | Export-Csv -Path $userListPath -Force
+    $newFile | Export-Csv -LiteralPath $userListPath -NoTypeInformation -Encoding UTF8 -ErrorAction Stop
     Invoke-Item $userListPath
-    Invoke-Item $not_found_users
+    if (Test-Path -LiteralPath $not_found_users) { Invoke-Item -LiteralPath $not_found_users }
 }ElseIf (!([string]::IsNullOrEmpty($Search_ADComputerList))) { ### SWITCH: -Search_ADComputerList ###
-    import-module activedirectory
+    Import-Module ActiveDirectory -ErrorAction Stop
+    $computers = @(Get-SoccomInputList -Path $Search_ADComputerList.Trim())
     $compListPath = "$resultsFolder\ComputerList.csv"
     If(Test-Path $compListPath) { # If file found
         Remove-Item $compListPath # remove log file   
     }
-    $input = $Search_ADComputerList.Trim()
-    Write-Host "Reading File: $input"
+    $searchValue = $Search_ADComputerList.Trim()
+    Write-Host "Reading File: $searchValue"
     # Export a compact inventory view for each requested hostname prefix.
-    $newFile = foreach($comp in Get-Content $input) {
-        $input = $comp.Trim()
-        Write-Host "$input"  
-       Get-ADComputer -Filter "DNSHostName -like '$input*'" -Property * | Select-Object Name,OperatingSystem,LastLogonDate,OperatingSystemServicePack,OperatingSystemVersion,SID,Description,DNSHostName,IPV4Address
+    $newFile = foreach($comp in $computers) {
+        $searchValue = $comp.Trim()
+        Write-Host "$searchValue"
+       Get-ADComputer -LDAPFilter "(dNSHostName=$(ConvertTo-LdapFilterValue $searchValue)*)" -Properties * -ErrorAction Stop | Select-Object Name,OperatingSystem,LastLogonDate,OperatingSystemServicePack,OperatingSystemVersion,SID,Description,DNSHostName,IPV4Address
     } 
-    $newFile | Export-Csv -Path $compListPath -Force
+    $newFile | Export-Csv -LiteralPath $compListPath -NoTypeInformation -Encoding UTF8 -ErrorAction Stop
     Invoke-Item $compListPath
 }ElseIf (!([string]::IsNullOrEmpty($Search_ADComputerName))) {	 ### SWITCH: -Search_ADComputerName ###
-    import-module activedirectory
-    $input = $Search_ADComputerName.Trim()
-    Write-Host "Searching Active Directory: $input"
+    Import-Module ActiveDirectory -ErrorAction Stop
+    $searchValue = $Search_ADComputerName.Trim()
+    Write-Host "Searching Active Directory: $searchValue"
     # Keep the single-computer view compact for quick hostname validation and asset
     # context during alert triage.
-    Get-ADComputer -Filter "DNSHostName -like '$input*'" -Property * | Select-Object Name,OperatingSystem,LastLogonDate,OperatingSystemServicePack,OperatingSystemVersion,SID,Description,DNSHostName,IPV4Address | format-list # Export-CSV AllWindows.csv -NoTypeInformation -Encoding UTF8
+    Get-ADComputer -LDAPFilter "(dNSHostName=$(ConvertTo-LdapFilterValue $searchValue)*)" -Properties * -ErrorAction Stop | Select-Object Name,OperatingSystem,LastLogonDate,OperatingSystemServicePack,OperatingSystemVersion,SID,Description,DNSHostName,IPV4Address | format-list # Export-CSV AllWindows.csv -NoTypeInformation -Encoding UTF8
 }
 ElseIf (!([string]::IsNullOrEmpty($Get_BitlockerRecoveryKey))){
-    # Get_BitlockerRecoveryKey
+    Import-Module ActiveDirectory -ErrorAction Stop
     Write-Host "Bitlocker Recovery Key for: $Get_BitlockerRecoveryKey"
     Get_BitlockerRecoveryKey $Get_BitlockerRecoveryKey
     Write-Host "" 
@@ -2312,26 +2333,8 @@ ElseIf (!([string]::IsNullOrEmpty($Get_BitlockerRecoveryKey))){
 }ElseIf ($Make_IRTemplate) {
     New-IRNotesTemplate | Out-Null
 
-}Else{ # Check Switches or eval for possible No Input errors. Exit 
-    $errorCount = 1 #Counter holds the value of Zero unless a Switch is selected.
-    
-    #Switch function created to run commands with switches that do not require input variables 
-    Switch ($PSBoundParameters.GetEnumerator().Where({$_.Value -eq $true}).Key){
-        #Update SOCCOM - write VBS to perform the update 
-        'SOCCOM_Update' {
-            Write-Host 'SOCCOM Updating...'
-            #Write-Host ' '
-            UpdateSOCCOM
-            Write-Host 'SOCCOM Updated.'  
-            Write-Host ' ' 
-            $errorCount = 0 
-         }
-    }#End Switch functions 
-  
-    #If $errorCount == 1, then input error - no switch supplied -or- no switch supplied with the proper input 
-    If ($errorCount -eq 1){ 
-        Write-Host "s0m37h1ng SOCCOM w3n7 wr0ng. pl34s3 7ry 4g14n."
-        Write-Host " "
-    } 
-    Exit
-}#End Main If 
+}ElseIf ($SOCCOM_Update) {
+    UpdateSOCCOM
+}Else {
+    Get-Help $script:SoccomScriptPath -Examples
+}
